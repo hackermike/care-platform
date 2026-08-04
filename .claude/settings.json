@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python *)",
+      "Bash(.venv/bin/python3 *)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/pytest *)",
+      "Bash(.venv/bin/ruff *)",
+      "Bash(.venv/bin/uvicorn *)",
+      "Bash(.venv/bin/alembic *)",
+      "Bash(./start.sh*)",
+      "Bash(./dev-scripts/*)",
+      "Bash(./scripts/dev/*)",
+      "Bash(docker compose *)",
+      "Bash(docker-compose *)",
+      "Bash(pkill -f \"uvicorn app.main\"*)",
+      "Bash(gh pr checks *)",
+      "Bash(gh pr view *)"
+    ]
+  }
+}

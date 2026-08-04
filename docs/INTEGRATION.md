@@ -27,9 +27,19 @@ logic from the ORM layer** so the platform can supply its own multi-tenant
 persistence — rather than shipping the ORM models and bolting a `tenant_id` on
 (fast, but it will hurt).
 
-**Until `breakout-core` exists:** stub the boundary in this repo (a thin
-`app/domain/` interface) and track the dependency. Don't re-implement superbills,
-CPT codes, or money math here.
+**`breakout-core` now exists** — extracted from `breakout-billing` as an
+ORM-free package that operates on structural `Protocol`s (`PaymentLike`,
+`AppointmentLike`, `ClientLike`, `ProviderLike`). Depend on it here rather than
+re-implementing superbills, CPT codes, or money math. Until it's published to a
+private index, install it from the billing repo:
+
+```
+pip install "breakout-core @ git+https://github.com/hackermike/breakout-billing.git#subdirectory=breakout-core"
+```
+
+Your (multi-tenant) models just need to expose the attributes the Protocols
+describe. Later: give `breakout-core` its own repo or a private package index and
+pin a version.
 
 ## 2. JSON export/import contract
 

@@ -11,6 +11,9 @@ dist/
 build/
 *.egg-info/
 
+# Machine-specific Claude Code permission grants (the committed one is settings.json)
+.claude/settings.local.json
+
 # Throwaway probes / debug scripts (write with editor tools, run by path)
 scripts/dev/
 
