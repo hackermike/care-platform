@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+*.pyo
+.Python
+.venv/
+venv/
+*.db
+.env
+.secret_key
+dist/
+build/
+*.egg-info/
+
+# Throwaway probes / debug scripts (write with editor tools, run by path)
+scripts/dev/
+
+# Local editor/OS cruft
+.DS_Store
+.idea/
+.vscode/
