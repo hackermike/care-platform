@@ -7,6 +7,19 @@ extend-exclude = ["migrations"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.flake8-bugbear]
+# `Depends(...)`/`Form(...)` in argument defaults is FastAPI's declaration
+# syntax, not the mutable-default bug B008 exists to catch.
+extend-immutable-calls = [
+  "fastapi.Depends",
+  "fastapi.Form",
+  "fastapi.Query",
+  "fastapi.Path",
+  "fastapi.Header",
+  "fastapi.Cookie",
+  "fastapi.Body",
+]
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]

@@ -3,11 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Care Platform{% endblock %}</title>
+  {# The portal is white-labeled per tenant (docs/DECISIONS.md): a client sees
+     their network's name, never the platform's. #}
+  <title>{% block title %}{{ tenant.display_name if tenant else "Care Platform" }}{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+  <script>
+    // Echo the CSRF cookie into every HTMX request (see app/security/csrf.py).
+    document.body && document.body.addEventListener('htmx:configRequest', function (e) {
+      var m = document.cookie.match(/(?:^|; )care_csrf=([^;]*)/);
+      if (m) { e.detail.headers['X-CSRF-Token'] = decodeURIComponent(m[1]); }
+    });
+  </script>
 </head>
 <body class="bg-gray-50 text-gray-800">
+  {% if user %}
+  <header class="border-b bg-white">
+    <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+      <span class="font-semibold" {% if tenant and tenant.brand_color %}style="color: {{ tenant.brand_color }}"{% endif %}>
+        {{ tenant.display_name if tenant else "Care Platform" }}
+      </span>
+      <div class="flex items-center gap-4 text-sm">
+        <span class="text-gray-500">{{ user.display_name }} · {{ user.role }}</span>
+        <form method="post" action="/logout">
+          <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}" />
+          <button class="text-gray-600 hover:text-gray-900 underline">Sign out</button>
+        </form>
+      </div>
+    </div>
+  </header>
+  {% endif %}
   {% block content %}{% endblock %}
 </body>
 </html>

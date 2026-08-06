@@ -51,7 +51,10 @@ docker compose up -d db                      # local Postgres for development
 ./dev-scripts/make-migration.sh "msg"        # autogenerate a migration (review it)
 ./dev-scripts/lint-and-test.sh               # ruff + pytest (local CI equivalent)
 ./dev-scripts/open-pr.sh "Title" body.md     # open a PR with the body from a file
+DRAFT=1 ./dev-scripts/open-pr.sh "T" body.md # ...as a draft
+./dev-scripts/ready-pr.sh 12                 # draft -> ready (triggers review bots once)
 ./dev-scripts/merge-pr.sh 12                 # squash-merge a PR (CI must be green)
+.venv/bin/python dev-scripts/manage.py --help  # create tenants/users, reset passwords
 .venv/bin/pytest -q                          # tests (SQLite, no external services)
 .venv/bin/ruff check .                       # lint
 ```
@@ -79,6 +82,16 @@ the migration** (prefer nullable columns) → it applies on next start.
 **Multi-tenancy rule:** every tenant-owned table has a non-null `tenant_id`
 foreign key, and every query is tenant-scoped. Don't add a tenant-owned table
 without it. A missing scope is a data-leak bug, not a style nit.
+
+**Scoping is enforced in one place: `app/tenancy.py`.** Routes take a
+`TenantScope` (via `Depends(get_scope)`) and call `scope.query(Model)`,
+`scope.get(Model, pk)`, and `scope.add(obj)` — never `db.query(...)` directly.
+`scope.query()` raises for a model with no `tenant_id`, and `scope.add()` stamps
+it, so forgetting to scope becomes an error rather than a leak. Cross-tenant
+access needs a plain `Session` and an explicit comment saying why.
+
+`tests/test_migrations.py` asserts the migration chain and the models agree, and
+that every tenant-owned table carries `tenant_id` — so schema drift fails CI.
 
 ## Feature workflow
 

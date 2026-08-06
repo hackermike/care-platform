@@ -16,10 +16,13 @@ concept/plan (`docs/`). Read this file, then `docs/DECISIONS.md`, then start.
 
 ## Do this first (in order)
 
-1. **Settle the product decisions in `docs/DECISIONS.md`.** The concept note is
-   blunt that *"who is the customer"* and *"claims vs sliding-scale cash"* drive
-   nearly everything downstream — stack details, data model, and launch scope all
-   follow. Don't build features before these are answered.
+1. ~~**Settle the product decisions in `docs/DECISIONS.md`.**~~ **Done
+   2026-08-06.** The customer is the therapist network (infrastructure);
+   insurance claims are in scope; therapists are listed, not employed; and the
+   launch is state-agnostic. In-product video and a substantial client portal are
+   also in scope — note that this *reverses* the telehealth default described at
+   the bottom of this file. Read `docs/DECISIONS.md` for the full set and
+   `docs/MILESTONES.md` for the plan that follows.
 2. **Depend on `breakout-core`.** The plan is to extract the shared domain
    (`Client`/`Appointment`/`Payment`/`Provider`, superbill PDF, CPT catalog,
    money math, importer) out of `breakout-billing` into a versioned package this
@@ -43,6 +46,9 @@ concept/plan (`docs/`). Read this file, then `docs/DECISIONS.md`, then start.
 ## Not carried over
 
 The original handoff included a default-telehealth-link feature branch. Per the
-owner's 2026-08-02 decision, **telehealth was dropped from Breakout Billing** and
-is a deliberate product decision here too — don't assume it. Whether this
-platform hosts in-product video is one of the DECISIONS.
+owner's 2026-08-02 decision, **telehealth was dropped from Breakout Billing** —
+that still holds, and the branch is not applied here.
+
+**Update 2026-08-06:** the platform *does* host in-product video (milestone M6),
+via a BAA-covered vendor. That is a platform decision only; it does not travel
+back to Breakout Billing.
