@@ -50,6 +50,7 @@ docker compose up -d db                      # local Postgres for development
 .venv/bin/alembic upgrade head               # apply migrations
 ./dev-scripts/make-migration.sh "msg"        # autogenerate a migration (review it)
 ./dev-scripts/lint-and-test.sh               # ruff + pytest (local CI equivalent)
+./dev-scripts/smoke-e2e.sh                   # end-to-end: migrate, provision, log in
 ./dev-scripts/open-pr.sh "Title" body.md     # open a PR with the body from a file
 DRAFT=1 ./dev-scripts/open-pr.sh "T" body.md # ...as a draft
 ./dev-scripts/ready-pr.sh 12                 # draft -> ready (triggers review bots once)
