@@ -28,7 +28,7 @@ The foundation `START-HERE.md` requires before feature work.
 Audit logging and CSRF land here rather than later because retrofitting either
 across an existing surface is far more expensive than starting with them.
 
-## M2 — The `breakout-core` boundary
+## M2 — The `breakout-core` boundary ✅
 
 - Depend on `breakout-core` (already extracted, ORM-free, structural
   `Protocol`s — see `INTEGRATION.md`).
@@ -38,6 +38,27 @@ across an existing surface is far more expensive than starting with them.
 
 Proves the contract holds against multi-tenant persistence before anything is
 built on top of it.
+
+**Shipped.** `Client`, `Appointment`, `Payment`, `TherapistProfile` (all
+tenant-scoped) satisfy the Protocols; `tests/test_breakout_core.py` proves it by
+running the real library against real model instances, up to generating an
+actual superbill PDF.
+
+Two decisions worth knowing about:
+
+- **Money is stored as `Numeric(10, 2)`, not float.** `breakout-core`'s
+  Protocols declare `float` — fine for a solo superbill tool, wrong for a
+  platform that will submit claims and reconcile remittances. Storage stays
+  exact and float appears only at the library boundary, via properties in
+  `app/models/money.py`. That file is the only thing that changes if
+  `breakout-core` later moves to `Decimal`.
+- **Claims-shaping arrived early.** CPT code, modifiers, diagnosis codes, and
+  place of service are on `Appointment` now, and `Payment` already has an
+  `insurance` method, so M7 attaches a `Claim` to these rows instead of
+  restructuring them.
+
+`TherapistLicense` and `app/licensure.py` also land here — the residue of the
+state-agnostic decision. An unknown client state fails closed.
 
 ## M3 — First end-to-end therapist flow
 

@@ -41,6 +41,30 @@ Your (multi-tenant) models just need to expose the attributes the Protocols
 describe. Later: give `breakout-core` its own repo or a private package index and
 pin a version.
 
+### As built (M2, 2026-08-06)
+
+The dependency is **pinned to a commit**, not a branch — an unpinned git
+dependency means an unrelated push to `breakout-billing` silently changes this
+build. Bump it deliberately. It becomes a version pin once `breakout-core` is
+published to an index.
+
+The platform models satisfying the Protocols are `Client`, `Appointment`,
+`Payment`, and `TherapistProfile`. Two places where the shapes deliberately
+differ from storage, both adapted by properties rather than by changing the
+schema:
+
+| Protocol wants | Platform stores | Why |
+|---|---|---|
+| `amount: float`, `fee: float \| None` | `Numeric(10, 2)` → `Decimal` | Binary floats can't represent most cent values and the error compounds across sums. Tolerable for one therapist's superbills; not for claims and remittance reconciliation. See `app/models/money.py`. |
+| `datetime` | `starts_at` | A column named `datetime` shadows the stdlib module in every model file that imports it. |
+
+`tests/test_breakout_core.py` is the guard: it feeds real model instances to the
+real library functions, so a drift in either shape fails there rather than in
+production.
+
+**If `breakout-core` moves to `Decimal`,** `app/models/money.py` and the
+properties on `Appointment`/`Payment` are the only things that change.
+
 ## 2. JSON export/import contract
 
 The therapist-portability path and the honest "own your data" answer.
