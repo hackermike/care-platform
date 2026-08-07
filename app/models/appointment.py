@@ -72,6 +72,9 @@ class Appointment(Base):
     payments = relationship(
         "Payment", back_populates="appointment", cascade="all, delete-orphan"
     )
+    notes = relationship(
+        "ClinicalNote", back_populates="appointment", cascade="all, delete-orphan"
+    )
 
     # --- breakout_core.domain.AppointmentLike -----------------------------
     # The protocol names differ from the column names where storage and the

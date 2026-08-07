@@ -3,9 +3,9 @@
 {% block content %}
 <main class="max-w-5xl mx-auto p-10">
   <h1 class="text-2xl font-semibold">Practice</h1>
-  <p class="mt-2 text-gray-600">
-    Signed in as {{ user.display_name }}. Clients, scheduling, notes, and billing
-    land here in milestone M3 — see <code>docs/MILESTONES.md</code>.
-  </p>
+  <p class="mt-2 text-gray-600">Signed in as {{ user.display_name }}.</p>
+  <ul class="mt-6 space-y-2">
+    <li><a class="underline" href="/app/clients">Caseload</a> — clients, sessions, notes, and billing</li>
+  </ul>
 </main>
 {% endblock %}

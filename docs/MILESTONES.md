@@ -60,17 +60,30 @@ Two decisions worth knowing about:
 `TherapistLicense` and `app/licensure.py` also land here — the residue of the
 state-agnostic decision. An unknown client state fails closed.
 
-## M3 — First end-to-end therapist flow
+## M3 — First end-to-end therapist flow ✅
 
 Client → appointment → session note → charge → payment → superbill.
 
-- Timezone-aware datetimes throughout (Billing's naive-local approach does not
-  survive multi-tenant hosting).
-- **The money model gets its claims shape here:** `Charge` carrying CPT,
-  diagnosis, and place-of-service, with a nullable `Claim` relationship, so M7
-  attaches to it instead of rewriting it.
-- Clinical notes land in this milestone — they are the therapist's daily surface
-  and they feed claim construction.
+**Shipped.** `app/routers/practice.py` (the surface), `app/services/practice.py`
+(the rules), `app/models/note.py`, `app/phi.py`. The claims shaping happened
+early, in M2.
+
+Three rules worth knowing, all enforced in the service layer rather than the
+templates so they cannot vary by entry point:
+
+- **A therapist sees only their own caseload; an admin sees the tenant.** That
+  is a clinical confidentiality boundary, not just access control — a therapist
+  has no treatment relationship with a colleague's client. Records outside the
+  caseload return **404, not 403**, because a 403 confirms the record exists.
+- **Signing locks a note.** An unsigned note is a draft; a signed one is a
+  record, and corrections are made by addendum. A clinical record that can be
+  silently rewritten afterwards is not evidence of anything. Only the author may
+  sign — an admin countersigning someone else's note would void the attestation.
+- **Licensure is checked at booking**, against the client's state.
+
+`app/phi.py` makes the M1 audit log real: every route that reads or writes
+clinical data records that it did, carrying record identifiers and never
+content. There is a test asserting no PHI reaches the audit log.
 
 ## M4 — Client portal v1
 

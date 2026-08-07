@@ -58,6 +58,39 @@ curl -sS -b "${WORK}/jar" -o /dev/null -w 'app: %{http_code}\n' http://127.0.0.1
 echo "==> admin surface is refused to a therapist"
 curl -sS -b "${WORK}/jar" -o /dev/null -w 'admin: %{http_code}\n' http://127.0.0.1:8099/admin
 
+echo "==> therapist profile, licence, and a client"
+.venv/bin/python -c "
+from app.database import SessionLocal
+from app.models.client import Client
+from app.models.provider import TherapistLicense, TherapistProfile
+from app.models.user import User
+db = SessionLocal()
+user = db.query(User).filter(User.email == 'dr@example.com').one()
+profile = TherapistProfile(tenant_id=user.tenant_id, user_id=user.id, name='Dr Alex Reed',
+                           credentials='LCSW', npi='1234567890', practice_name='Riverside')
+db.add(profile); db.flush()
+db.add(TherapistLicense(tenant_id=user.tenant_id, therapist_id=profile.id, state='CA'))
+db.add(Client(tenant_id=user.tenant_id, therapist_id=profile.id, first_name='Sam',
+              last_name='Rivera', state='CA', diagnosis_codes='F41.1'))
+db.commit()
+print('  seeded therapist profile, CA licence, and one client')
+"
+
+echo "==> caseload"
+curl -sS -b "${WORK}/jar" http://127.0.0.1:8099/app/clients | grep -o 'Sam Rivera' | head -1
+
+echo "==> book a session"
+CT="$(curl -sS -b "${WORK}/jar" -c "${WORK}/jar" http://127.0.0.1:8099/app/clients \
+  | grep -o 'name="csrf_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')"
+curl -sS -b "${WORK}/jar" -o /dev/null -w 'book: %{http_code}\n' \
+  -d "starts_at=2026-03-02T15:00&cpt_code=90837&csrf_token=${CT}" \
+  http://127.0.0.1:8099/app/clients/1/appointments
+
+echo "==> superbill PDF"
+curl -sS -b "${WORK}/jar" -o "${WORK}/superbill.pdf" -w 'superbill: %{http_code} %{content_type}\n' \
+  "http://127.0.0.1:8099/app/clients/1/superbill?start=2026-01-01&end=2026-12-31"
+head -c 4 "${WORK}/superbill.pdf"; echo " <- PDF magic bytes"
+
 echo "==> audit trail"
 .venv/bin/python -c "
 import os

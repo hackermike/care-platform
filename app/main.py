@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 import app.models  # noqa: F401 — registers models on Base
 from app.auth.dependencies import NotAuthenticated, login_redirect
 from app.db_init import run_migrations
-from app.routers import auth, dashboards, pages
+from app.routers import auth, dashboards, pages, practice
 from app.security.csrf import CSRFError
 from app.security.deps import csrf_protect
 from app.security.middleware import CSRFTokenMiddleware
@@ -32,6 +32,7 @@ app.add_middleware(CSRFTokenMiddleware)
 app.include_router(pages.router)
 app.include_router(auth.router)
 app.include_router(dashboards.router)
+app.include_router(practice.router)
 
 
 @app.exception_handler(NotAuthenticated)
