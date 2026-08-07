@@ -48,7 +48,8 @@ for the target shape.
 ## Docs
 
 - [`START-HERE.md`](START-HERE.md) — read first; what's here and what to do next
-- [`docs/DECISIONS.md`](docs/DECISIONS.md) — the open product decisions (settle these first)
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — product decisions (the four core ones settled 2026-08-06)
+- [`docs/MILESTONES.md`](docs/MILESTONES.md) — the milestone plan that follows from them
 - [`docs/CONCEPT.md`](docs/CONCEPT.md) — full concept, prior art, naming
 - [`docs/NEW-REPO-PLAN.md`](docs/NEW-REPO-PLAN.md) — why separate repo/session
 - [`docs/INTEGRATION.md`](docs/INTEGRATION.md) — breakout-core + JSON contract
