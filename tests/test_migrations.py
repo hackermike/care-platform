@@ -30,6 +30,8 @@ EXPECTED_TABLES = {
     "clients",
     "appointments",
     "payments",
+    "clinical_notes",
+    "note_addenda",
 }
 
 

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Session — {{ tenant.display_name }}{% endblock %}
+{% macro note_form(note, kind, heading, blurb) %}
+<section class="rounded border bg-white p-4">
+  <h2 class="font-semibold">{{ heading }}</h2>
+  <p class="mt-1 text-xs text-gray-500">{{ blurb }}</p>
+
+  {% if note and note.is_signed %}
+    <p class="mt-3 whitespace-pre-wrap text-sm">{{ note.body }}</p>
+    <p class="mt-2 text-xs text-gray-500">
+      Signed {{ note.signed_at.strftime("%Y-%m-%d %H:%M") }} — locked. Corrections
+      are made by addendum.
+    </p>
+    {% for addendum in note.addenda %}
+    <div class="mt-3 border-l-2 border-gray-200 pl-3">
+      <p class="text-xs text-gray-500">Addendum · {{ addendum.created_at.strftime("%Y-%m-%d %H:%M") if addendum.created_at }}</p>
+      <p class="whitespace-pre-wrap text-sm">{{ addendum.body }}</p>
+    </div>
+    {% endfor %}
+    <form method="post" action="/app/notes/{{ note.id }}/addenda" class="mt-3 space-y-2">
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}" />
+      <textarea name="body" rows="3" required placeholder="Add an addendum"
+                class="w-full rounded border px-3 py-2 text-sm"></textarea>
+      <button class="rounded border px-3 py-1 text-sm">Add addendum</button>
+    </form>
+  {% else %}
+    <form method="post" action="/app/appointments/{{ appointment.id }}/notes" class="mt-3 space-y-2">
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}" />
+      <input type="hidden" name="kind" value="{{ kind }}" />
+      <textarea name="body" rows="5" class="w-full rounded border px-3 py-2 text-sm">{{ note.body if note else "" }}</textarea>
+      <div class="flex gap-2">
+        <button class="rounded border px-3 py-1 text-sm">Save draft</button>
+        <button name="sign" value="1" class="rounded bg-gray-900 px-3 py-1 text-sm text-white">
+          Sign &amp; lock
+        </button>
+      </div>
+    </form>
+  {% endif %}
+</section>
+{% endmacro %}
+{% block content %}
+<main class="max-w-5xl mx-auto p-10">
+  <a class="text-sm text-gray-500 underline" href="/app/clients/{{ client.id }}">← {{ client.patient_name }}</a>
+  <h1 class="mt-2 text-2xl font-semibold">
+    {{ appointment.starts_at.strftime("%A %d %B %Y, %H:%M") }}
+  </h1>
+  <p class="mt-1 text-sm text-gray-500">
+    {{ appointment.cpt_code or "no CPT" }}
+    {% if appointment.modifiers %} · modifiers {{ appointment.modifiers|join(", ") }}{% endif %}
+    · {{ appointment.status }}
+    {% if appointment.fee is not none %} · ${{ "%.2f"|format(appointment.fee) }}{% endif %}
+    · paid ${{ "%.2f"|format(paid) }}
+  </p>
+
+  {% if appointment.status != "completed" %}
+  <form method="post" action="/app/appointments/{{ appointment.id }}/complete" class="mt-4">
+    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}" />
+    <button class="rounded bg-gray-900 px-3 py-2 text-sm text-white">Mark completed</button>
+    <span class="ml-2 text-xs text-gray-500">Completing a session is what makes it chargeable.</span>
+  </form>
+  {% endif %}
+
+  <div class="mt-8 grid grid-cols-2 gap-6">
+    {{ note_form(progress, "progress", "Progress note",
+                 "Part of the medical record; disclosable on a records request.") }}
+    {{ note_form(psychotherapy, "psychotherapy", "Psychotherapy note",
+                 "Held to a stricter standard under HIPAA and excluded from ordinary disclosure.") }}
+  </div>
+
+  <section class="mt-8 max-w-md">
+    <h2 class="font-semibold">Payments</h2>
+    <ul class="mt-3 text-sm">
+      {% for payment in appointment.payments %}
+      <li class="border-b py-2">
+        {% if payment.is_refund %}Refund{% else %}Payment{% endif %}
+        ${{ "%.2f"|format(payment.amount) }}
+        {% if payment.method %} · {{ payment.method }}{% endif %}
+      </li>
+      {% else %}
+      <li class="py-2 text-gray-500">Nothing recorded.</li>
+      {% endfor %}
+    </ul>
+    <form method="post" action="/app/appointments/{{ appointment.id }}/payments" class="mt-3 space-y-2">
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}" />
+      <div class="grid grid-cols-2 gap-2">
+        <input name="amount" required placeholder="Amount" class="rounded border px-3 py-2" />
+        <select name="method" class="rounded border px-3 py-2">
+          <option value="card">Card</option>
+          <option value="cash">Cash</option>
+          <option value="check">Check</option>
+          <option value="transfer">Transfer</option>
+          <option value="insurance">Insurance</option>
+        </select>
+      </div>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="is_refund" value="1" /> This is a refund
+      </label>
+      <button class="rounded border px-3 py-2 text-sm">Record</button>
+    </form>
+  </section>
+</main>
+{% endblock %}
