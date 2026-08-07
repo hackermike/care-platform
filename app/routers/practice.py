@@ -4,25 +4,25 @@ Every route here reads or writes PHI, so every route records that it did
 (`app/phi.py`). Records that do not belong to the actor return 404 rather than
 403 — a 403 confirms the record exists, which is itself a disclosure.
 """
-from datetime import date, datetime
+from datetime import date
 
 from breakout_core import cpt, finances
 from breakout_core.superbill import build_superbill_pdf
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import RedirectResponse, Response
 
-from app import licensure, phi
+from app import forms, licensure, phi
 from app.auth.dependencies import require_therapist
 from app.models.appointment import STATUSES, Appointment
 from app.models.client import Client
 from app.models.money import to_decimal
-from app.models.note import KIND_PROGRESS, KIND_PSYCHOTHERAPY
+from app.models.note import KIND_PROGRESS, KIND_PSYCHOTHERAPY, KINDS
+from app.models.payment import METHODS
 from app.models.user import User
 from app.services import practice
 from app.services.practice import NotPermitted
 from app.templates_config import templates
 from app.tenancy import TenantScope, get_scope
-from app.timeutil import utcnow
 
 router = APIRouter(prefix="/app")
 
@@ -107,11 +107,11 @@ async def create_client(
     actor = _actor(scope, user)
     client = Client(
         therapist_id=actor.profile_id,
-        first_name=first_name.strip(),
-        last_name=last_name.strip(),
-        state=(state or "").strip().upper() or None,
-        email=(email or "").strip() or None,
-        diagnosis_codes=(diagnosis_codes or "").strip() or None,
+        first_name=forms.required_text(first_name, "First name", max_length=100),
+        last_name=forms.required_text(last_name, "Last name", max_length=100),
+        state=forms.parse_state(state),
+        email=forms.optional_text(email),
+        diagnosis_codes=forms.optional_text(diagnosis_codes),
     )
     scope.add(client)
     scope.flush()
@@ -147,18 +147,16 @@ async def create_appointment(
         if not allowed:
             return Response(allowed.reason, status_code=status.HTTP_400_BAD_REQUEST)
 
-    when = datetime.fromisoformat(starts_at)
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=utcnow().tzinfo)
-
-    code = (cpt_code or "").strip() or cpt.DEFAULT_CODE
+    when = forms.parse_datetime(starts_at, "Session time")
+    code = forms.parse_cpt(cpt_code)
     appointment = Appointment(
         client_id=client.id,
         therapist_id=actor.profile_id,
         starts_at=when,
         cpt_code=code,
         # Fall back to the shared catalog's default fee rather than a local copy.
-        fee_amount=to_decimal(fee) if fee else to_decimal(cpt.default_fee(code)),
+        fee_amount=forms.parse_money(fee, "Fee", required=False)
+        or to_decimal(cpt.default_fee(code)),
         diagnosis_codes=client.diagnosis_codes,
     )
     scope.add(appointment)
@@ -240,8 +238,7 @@ async def save_note(
     appointment = practice.get_appointment(scope, actor, appointment_id)
     if appointment is None:
         return _not_found()
-    if kind not in (KIND_PROGRESS, KIND_PSYCHOTHERAPY):
-        return Response("Unknown note kind.", status_code=status.HTTP_400_BAD_REQUEST)
+    kind = forms.parse_choice(kind, KINDS, "note kind", default=KIND_PROGRESS)
 
     try:
         note = practice.upsert_note(scope, actor, appointment, kind, body)
@@ -305,15 +302,16 @@ async def add_payment(
     appointment = practice.get_appointment(scope, actor, appointment_id)
     if appointment is None:
         return _not_found()
-    try:
-        payment = practice.record_payment(
-            scope, appointment, amount,
-            method=(method or None),
-            servicer_fee=(servicer_fee or None),
-            is_refund=bool(is_refund),
-        )
-    except ValueError as exc:
-        return Response(str(exc), status_code=status.HTTP_400_BAD_REQUEST)
+    payment = practice.record_payment(
+        scope,
+        appointment,
+        forms.parse_money(amount, "Payment amount"),
+        method=forms.parse_choice(method, METHODS, "payment method", default=None)
+        if method
+        else None,
+        servicer_fee=forms.parse_money(servicer_fee, "Processor fee", required=False),
+        is_refund=bool(is_refund),
+    )
     scope.flush()
     phi.modified(
         scope.db, user, phi.RESOURCE_PAYMENT, payment.id,
@@ -352,8 +350,10 @@ async def superbill(
         )
 
     today = date.today()
-    start_date = date.fromisoformat(start) if start else today.replace(month=1, day=1)
-    end_date = date.fromisoformat(end) if end else today
+    start_date = forms.parse_date(start, "Start date") or today.replace(month=1, day=1)
+    end_date = forms.parse_date(end, "End date") or today
+    if start_date > end_date:
+        raise forms.FormError("The start date must not be after the end date.")
 
     appointments = [
         appt

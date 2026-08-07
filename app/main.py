@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 import app.models  # noqa: F401 — registers models on Base
 from app.auth.dependencies import NotAuthenticated, login_redirect
 from app.db_init import run_migrations
+from app.forms import FormError
 from app.routers import auth, dashboards, pages, practice
 from app.security.csrf import CSRFError
 from app.security.deps import csrf_protect
@@ -72,6 +73,16 @@ async def _cross_tenant(request: Request, exc: CrossTenantError):
     return PlainTextResponse(
         "Internal error.", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
     )
+
+
+@app.exception_handler(FormError)
+async def _bad_form_input(request: Request, exc: FormError):
+    """Invalid user input is a 400 carrying the reason, never a 500.
+
+    Centralised so that adding a form field does not mean re-deciding how
+    malformed input behaves.
+    """
+    return PlainTextResponse(str(exc), status_code=status.HTTP_400_BAD_REQUEST)
 
 
 @app.exception_handler(CSRFError)
