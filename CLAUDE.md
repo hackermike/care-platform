@@ -51,12 +51,15 @@ docker compose up -d db                      # local Postgres for development
 ./dev-scripts/make-migration.sh "msg"        # autogenerate a migration (review it)
 ./dev-scripts/lint-and-test.sh               # ruff + pytest (local CI equivalent)
 ./dev-scripts/smoke-e2e.sh                   # end-to-end: migrate, provision, log in
+./dev-scripts/check-migrations.sh            # migrate up/down/up + schema-vs-models
+./dev-scripts/protect-main.sh                # branch protection (public repo only)
 ./dev-scripts/open-pr.sh "Title" body.md     # open a PR with the body from a file
 DRAFT=1 ./dev-scripts/open-pr.sh "T" body.md # ...as a draft
 ./dev-scripts/ready-pr.sh 12                 # draft -> ready (triggers review bots once)
 ./dev-scripts/merge-pr.sh 12                 # squash-merge a PR (CI must be green)
 .venv/bin/python dev-scripts/manage.py --help  # create tenants/users, reset passwords
 .venv/bin/pytest -q                          # tests (SQLite, no external services)
+TEST_DATABASE_URL=postgresql+psycopg://care:care@localhost:5432/care .venv/bin/pytest -q  # ...against Postgres
 .venv/bin/ruff check .                       # lint
 ```
 

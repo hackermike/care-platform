@@ -6,6 +6,11 @@ list of what stands between here and a system that may lawfully see a patient.
 
 Ordered by what blocks what.
 
+**Closed 2026-08-08:** CI now runs the full suite against PostgreSQL as well as
+SQLite, and applies the migration chain forwards, back to base, and forwards
+again on Postgres (`dev-scripts/check-migrations.sh`). The money and timezone
+columns are no longer unverified on the production database.
+
 ## 1. Blocking — must exist before any real patient data
 
 | Gap | Why it blocks | Where it goes |
@@ -15,7 +20,6 @@ Ordered by what blocks what.
 | **`SECRET_KEY` from a secrets manager** | Signs CSRF tokens. The app refuses to boot without a real value when `APP_ENV != dev`, but it must not come from a `.env` file on the box. | AWS Secrets Manager / GCP Secret Manager, injected as env. |
 | **Managed Postgres with encryption at rest + backups** | The app does no encryption of its own; that is delegated to the host. No backup policy exists. | RDS / Cloud SQL, PITR enabled, restores actually tested. |
 | **`TENANT_HOST_SUFFIX` set** | Tenants resolve by host subdomain. Unset outside dev, every request fails closed — which is correct, and also means nothing works. | Env var + wildcard DNS + wildcard TLS cert. |
-| **PostgreSQL in CI** | The test suite runs on SQLite. `Numeric(10, 2)` money columns and `DateTime(timezone=True)` behave differently on Postgres, and no migration has ever been applied to a real Postgres instance. | A `postgres` service container in `.github/workflows/ci.yml`. |
 
 ## 2. Blocking for real users — the product is unusable without these
 

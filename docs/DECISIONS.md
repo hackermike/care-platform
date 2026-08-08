@@ -84,7 +84,11 @@ The platform is a full practice system, not a thin billing layer:
   consumer brand is required, so *Breakout Care* is the working name and *Even
   Keel* is effectively out of the running. Still run USPTO + domain checks before
   committing.
-- **License.** _Decision: TBD._ Depends on the business model (see README).
+- **License.** **Decided 2026-08-08: AGPL-3.0**, matching Breakout Billing so the
+  family is coherent. The reciprocity is the point: anyone hosting a modified
+  version must publish their changes, which is the protection that matters when
+  the business is selling this as a hosted service. Selling commercial
+  exceptions remains available, since the copyright is held in one place.
 - **Frontend.** HTMX+Jinja remains the working default. Video is a vendor SDK
   embed and chat can ride HTMX's SSE/WebSocket extensions, so neither forces a
   SPA. Revisit only if the client portal demands it.
