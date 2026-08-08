@@ -32,6 +32,9 @@ EXPECTED_TABLES = {
     "payments",
     "clinical_notes",
     "note_addenda",
+    "form_templates",
+    "form_assignments",
+    "form_submissions",
 }
 
 

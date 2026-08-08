@@ -147,6 +147,75 @@ def deactivate_user(args) -> None:
         db.close()
 
 
+def add_form_template(args) -> None:
+    """Create a portal form template.
+
+    The question schema is read from a JSON file rather than the command line:
+    it is a list of field objects, and quoting that through a shell is how typos
+    become production forms.
+    """
+    import json
+
+    from app.models.forms import FORM_KINDS, FormTemplate
+
+    if args.kind not in FORM_KINDS:
+        sys.exit(f"kind must be one of {', '.join(FORM_KINDS)}.")
+
+    schema = None
+    if args.schema_file:
+        schema = json.dumps(json.loads(open(args.schema_file).read()))
+    body = open(args.body_file).read() if args.body_file else None
+    if not schema and not body:
+        sys.exit("Provide --schema-file, --body-file, or both.")
+
+    db = SessionLocal()
+    try:
+        tenant = _tenant(db, args.tenant)
+        template = FormTemplate(
+            tenant_id=tenant.id,
+            name=args.name,
+            kind=args.kind,
+            body=body,
+            schema_json=schema,
+            requires_signature=args.requires_signature,
+        )
+        db.add(template)
+        db.commit()
+        print(f"Created form template {template.name!r} (id={template.id}).")
+    finally:
+        db.close()
+
+
+def link_client(args) -> None:
+    """Attach a portal login to an existing client record.
+
+    Separate from account creation because the record usually exists first: a
+    therapist has a chart long before the client is invited to the portal.
+    """
+    from app.models.client import Client
+
+    db = SessionLocal()
+    try:
+        tenant = _tenant(db, args.tenant)
+        user = _user(db, tenant, args.email)
+        if user.role != "client":
+            sys.exit(f"{user.email} has role {user.role!r}, not 'client'.")
+        record = (
+            db.query(Client)
+            .filter(Client.tenant_id == tenant.id, Client.id == args.client_id)
+            .one_or_none()
+        )
+        if record is None:
+            sys.exit(f"No client {args.client_id} in tenant {tenant.slug!r}.")
+        if record.user_id and record.user_id != user.id:
+            sys.exit("That client record is already linked to a different account.")
+        record.user_id = user.id
+        db.commit()
+        print(f"Linked {user.email} to client {record.id} ({record.patient_name}).")
+    finally:
+        db.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -181,6 +250,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tenant", required=True)
     p.add_argument("--email", required=True)
     p.set_defaults(func=deactivate_user)
+
+    p = sub.add_parser("add-form-template", help="Create a portal form template.")
+    p.add_argument("--tenant", required=True)
+    p.add_argument("--name", required=True)
+    p.add_argument("--kind", default="intake", help="intake | consent")
+    p.add_argument("--schema-file", default=None, help="JSON list of field objects.")
+    p.add_argument("--body-file", default=None, help="Consent text to display.")
+    p.add_argument("--requires-signature", action="store_true")
+    p.set_defaults(func=add_form_template)
+
+    p = sub.add_parser("link-client", help="Attach a portal login to a client record.")
+    p.add_argument("--tenant", required=True)
+    p.add_argument("--email", required=True, help="The client user's email.")
+    p.add_argument("--client-id", required=True, type=int)
+    p.set_defaults(func=link_client)
 
     return parser
 

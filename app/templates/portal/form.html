@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ template.name }} — {{ tenant.display_name }}{% endblock %}
+{% block content %}
+<main class="max-w-2xl mx-auto p-10">
+  <a class="text-sm text-gray-500 underline" href="/portal">← Back</a>
+  <h1 class="mt-2 text-2xl font-semibold">{{ template.name }}</h1>
+
+  {% if error %}
+  <div role="alert" class="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  {% if template.body %}
+  <div class="mt-6 rounded border bg-white p-4 text-sm whitespace-pre-wrap">{{ template.body }}</div>
+  {% endif %}
+
+  <form method="post" action="/portal/forms/{{ assignment.id }}" class="mt-6 space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}" />
+
+    {% for field in fields %}
+    <div>
+      <label class="block text-sm font-medium" for="{{ field.key }}">
+        {{ field.label or field.key }}{% if field.required %} *{% endif %}
+      </label>
+
+      {% if field.type == "textarea" %}
+        <textarea id="{{ field.key }}" name="{{ field.key }}" rows="4"
+                  class="mt-1 w-full rounded border px-3 py-2"></textarea>
+      {% elif field.type == "choice" %}
+        <select id="{{ field.key }}" name="{{ field.key }}" class="mt-1 w-full rounded border px-3 py-2">
+          <option value="">—</option>
+          {% for option in field.options or [] %}
+          <option value="{{ option }}">{{ option }}</option>
+          {% endfor %}
+        </select>
+      {% elif field.type == "checkbox" %}
+        <input id="{{ field.key }}" name="{{ field.key }}" type="checkbox" value="1" class="mt-1" />
+      {% elif field.type == "date" %}
+        <input id="{{ field.key }}" name="{{ field.key }}" type="date" class="mt-1 w-full rounded border px-3 py-2" />
+      {% else %}
+        <input id="{{ field.key }}" name="{{ field.key }}" type="text" class="mt-1 w-full rounded border px-3 py-2" />
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if template.requires_signature %}
+    <div class="rounded border border-gray-300 bg-gray-50 p-4">
+      <label class="block text-sm font-medium" for="signature_name">
+        Type your full name to sign
+      </label>
+      <input id="signature_name" name="signature_name" required
+             class="mt-1 w-full rounded border px-3 py-2" />
+      <p class="mt-2 text-xs text-gray-500">
+        Typing your name signs this document electronically. We record the date,
+        time, and a fingerprint of the exact text shown above, so what you agreed
+        to stays verifiable even if the document is later revised.
+      </p>
+    </div>
+    {% endif %}
+
+    <button class="rounded bg-gray-900 px-4 py-2 text-white">
+      {% if template.requires_signature %}Sign and submit{% else %}Submit{% endif %}
+    </button>
+  </form>
+</main>
+{% endblock %}

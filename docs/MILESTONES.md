@@ -85,12 +85,32 @@ templates so they cannot vary by entry point:
 clinical data records that it did, carrying record identifiers and never
 content. There is a test asserting no PHI reaches the audit log.
 
-## M4 — Client portal v1
+## M4 — Client portal v1 ✅
 
 - Client login (the authz model's first real test with a non-staff user).
 - Intake forms, e-signature, billing document download.
 - **Per-tenant theming** — the portal is white-labeled (`DECISIONS.md`), so the
   `Tenant` model carries branding from this point.
+
+**Shipped.** `app/routers/portal.py`, `app/services/intake.py`,
+`app/models/forms.py`. Therapists assign forms from the client page; clients
+complete them in a network-branded portal.
+
+Two things worth knowing:
+
+- **The portal resolves the client from the session, never from a URL
+  parameter.** A client-facing surface that accepts a record id in the path is
+  one off-by-one away from showing someone else's chart, so the id is simply not
+  an input.
+- **A signature binds to the exact document.** `FormSubmission.document_hash`
+  stores a SHA-256 of the text and questions presented at signing time. Without
+  it, editing a consent template later would silently change what every past
+  client appears to have agreed to. `intake.signature_is_intact()` surfaces
+  when a template has drifted from what was signed.
+
+Submitted fields outside the template schema are dropped rather than stored —
+a submission is client input, and undeclared keys would let anyone with the form
+URL write arbitrary content into the clinical record.
 
 ## M5 — Messaging
 
