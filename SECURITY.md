@@ -37,6 +37,14 @@ We will acknowledge within a few days. There is no bounty programme.
   Audit entries deliberately never contain PHI; there is a test asserting it.
 - **Login throttling** per (tenant, email), with uniform failure messages so the
   login form cannot be used to enumerate accounts.
+- **Download filenames are allowlisted**, not escaped (`app/downloads.py`).
+  Client names reach `Content-Disposition`, and a quote in a name could
+  otherwise inject header parameters or spoof the saved filename.
+- **`next=` after login accepts only same-site relative paths**, rejecting
+  scheme-relative and backslash forms.
+- **A structural test asserts every route carries a role dependency** or is
+  explicitly listed as public (`tests/test_security.py`), so a new unguarded
+  route fails CI rather than waiting to be noticed.
 
 ## What is not yet implemented
 

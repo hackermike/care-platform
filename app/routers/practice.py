@@ -11,7 +11,7 @@ from breakout_core.superbill import build_superbill_pdf
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import RedirectResponse, Response
 
-from app import forms, licensure, phi
+from app import downloads, forms, licensure, phi
 from app.auth.dependencies import require_therapist
 from app.models.appointment import STATUSES, Appointment
 from app.models.client import Client
@@ -358,7 +358,7 @@ async def assign_form(
     if client is None:
         return _not_found()
 
-    template = scope.get(FormTemplate, int(template_id))
+    template = scope.get(FormTemplate, forms.parse_int(template_id, "Form template"))
     if template is None or not template.is_active:
         return Response(
             "Unknown form template.", status_code=status.HTTP_400_BAD_REQUEST
@@ -433,9 +433,13 @@ async def superbill(
     )
     scope.commit()
 
-    filename = f"superbill-{client.last_name.lower()}-{start_date}-{end_date}.pdf"
+    # The client's name is user-controlled, so the filename is sanitised rather
+    # than interpolated — see app/downloads.py.
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={"content-disposition": f'attachment; filename="{filename}"'},
+        headers=downloads.attachment_headers(
+            f"superbill-{client.last_name.lower()}-{start_date}-{end_date}.pdf",
+            fallback="superbill.pdf",
+        ),
     )
