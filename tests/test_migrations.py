@@ -20,7 +20,17 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Tables the migrations own. Kept explicit so a new table without a migration
 # fails here rather than being quietly skipped.
-EXPECTED_TABLES = {"tenants", "users", "user_sessions", "audit_logs"}
+EXPECTED_TABLES = {
+    "tenants",
+    "users",
+    "user_sessions",
+    "audit_logs",
+    "therapist_profiles",
+    "therapist_licenses",
+    "clients",
+    "appointments",
+    "payments",
+}
 
 
 @pytest.fixture

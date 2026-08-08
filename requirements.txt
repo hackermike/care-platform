@@ -7,4 +7,10 @@ python-multipart==0.0.32
 python-dotenv==1.2.2
 itsdangerous==2.2.0
 argon2-cffi==25.1.0
+
+# The shared domain library (docs/INTEGRATION.md). Pinned to a commit, not a
+# branch: an unpinned git dependency means an unrelated push to breakout-billing
+# silently changes this build. Bump deliberately.
+# Once breakout-core is published to an index, this becomes a version pin.
+breakout-core @ git+https://github.com/hackermike/breakout-billing.git@2d449f48ccd9450c4e0d11afadae90a00121d29b#subdirectory=breakout-core
 psycopg[binary]==3.2.3
