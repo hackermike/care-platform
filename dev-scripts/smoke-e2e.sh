@@ -91,6 +91,56 @@ curl -sS -b "${WORK}/jar" -o "${WORK}/superbill.pdf" -w 'superbill: %{http_code}
   "http://127.0.0.1:8099/app/clients/1/superbill?start=2026-01-01&end=2026-12-31"
 head -c 4 "${WORK}/superbill.pdf"; echo " <- PDF magic bytes"
 
+echo "==> client portal: seed a portal login and a consent form"
+cat > "${WORK}/consent.txt" <<'CONSENT'
+I consent to receive psychotherapy services from this practice.
+CONSENT
+cat > "${WORK}/intake.json" <<'SCHEMA'
+[{"key": "goals", "label": "What brings you in?", "type": "textarea", "required": true}]
+SCHEMA
+.venv/bin/python dev-scripts/manage.py create-user \
+  --tenant demo --email sam@example.com --role client \
+  --full-name "Sam Rivera" --password "correct-horse-battery"
+.venv/bin/python dev-scripts/manage.py link-client \
+  --tenant demo --email sam@example.com --client-id 1
+.venv/bin/python dev-scripts/manage.py add-form-template \
+  --tenant demo --name "Consent to treatment" --kind consent \
+  --body-file "${WORK}/consent.txt" --schema-file "${WORK}/intake.json" \
+  --requires-signature
+
+echo "==> therapist assigns the form"
+CT2="$(curl -sS -b "${WORK}/jar" -c "${WORK}/jar" http://127.0.0.1:8099/app/clients/1 \
+  | grep -o 'name="csrf_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')"
+curl -sS -b "${WORK}/jar" -o /dev/null -w 'assign: %{http_code}\n' \
+  -d "template_id=1&csrf_token=${CT2}" http://127.0.0.1:8099/app/clients/1/forms
+
+echo "==> client signs in and signs the consent"
+curl -sS -c "${WORK}/cjar" http://127.0.0.1:8099/login > /dev/null
+CT3="$(curl -sS -b "${WORK}/cjar" -c "${WORK}/cjar" http://127.0.0.1:8099/login \
+  | grep -o 'name="csrf_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')"
+curl -sS -b "${WORK}/cjar" -c "${WORK}/cjar" -o /dev/null -w 'client login: %{http_code}\n' \
+  -d "email=sam@example.com&password=correct-horse-battery&csrf_token=${CT3}" \
+  http://127.0.0.1:8099/login
+curl -sS -b "${WORK}/cjar" http://127.0.0.1:8099/portal | grep -o 'Consent to treatment' | head -1
+CT4="$(curl -sS -b "${WORK}/cjar" -c "${WORK}/cjar" http://127.0.0.1:8099/portal/forms/1 \
+  | grep -o 'name="csrf_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')"
+curl -sS -b "${WORK}/cjar" -o /dev/null -w 'sign: %{http_code}\n' \
+  --data-urlencode "goals=Anxiety at work" \
+  --data-urlencode "signature_name=Sam Rivera" \
+  --data-urlencode "csrf_token=${CT4}" \
+  http://127.0.0.1:8099/portal/forms/1
+
+echo "==> signature evidence"
+.venv/bin/python -c "
+from app.database import SessionLocal
+from app.models.forms import FormSubmission
+from app.services import intake
+db = SessionLocal()
+for s in db.query(FormSubmission).all():
+    print(f'  signed_by={s.signature_name!r} at={s.signed_at} ip={s.signature_ip}')
+    print(f'  hash={s.document_hash[:16]}... intact={intake.signature_is_intact(s)}')
+"
+
 echo "==> audit trail"
 .venv/bin/python -c "
 import os
