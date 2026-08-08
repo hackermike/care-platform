@@ -192,3 +192,56 @@ class TestRoutesAreGuarded:
             "these routes have no role dependency and are not declared public: "
             f"{sorted(unguarded)}"
         )
+
+
+class TestSecurityHeaders:
+    """Set on every response, because the page that forgets one is the problem."""
+
+    def test_headers_are_present_on_a_page(self, client, db):
+        make_tenant(db, slug="demo")
+        r = client.get("/login")
+        assert r.headers["x-frame-options"] == "DENY"
+        assert r.headers["x-content-type-options"] == "nosniff"
+        assert r.headers["referrer-policy"] == "no-referrer"
+        assert "content-security-policy" in r.headers
+
+    def test_headers_are_present_on_an_error_response(self, client):
+        """No tenant exists, so this 404s from an exception handler — the
+        middleware must still have wrapped it."""
+        r = client.get("/login")
+        assert r.status_code == 404
+        assert r.headers["x-frame-options"] == "DENY"
+
+    def test_the_csp_forbids_framing_and_object_embedding(self, client, db):
+        make_tenant(db, slug="demo")
+        csp = client.get("/login").headers["content-security-policy"]
+        assert "frame-ancestors 'none'" in csp
+        assert "object-src 'none'" in csp
+        assert "form-action 'self'" in csp
+
+    def test_connect_src_allows_no_third_party(self, client, db):
+        """A page rendering PHI must not be able to send it anywhere else."""
+        make_tenant(db, slug="demo")
+        csp = client.get("/login").headers["content-security-policy"]
+        assert "connect-src 'self'" in csp
+
+    def test_hsts_is_not_sent_in_dev(self, client, db):
+        """Pinning a browser to HTTPS for a host that serves plain HTTP locally
+        would break development for as long as the max-age lasts."""
+        make_tenant(db, slug="demo")
+        assert "strict-transport-security" not in client.get("/login").headers
+
+    def test_hsts_is_sent_outside_dev(self, monkeypatch):
+        from app.security import headers
+
+        monkeypatch.setattr(headers.config, "IS_DEV", False)
+        assert "strict-transport-security" in headers.security_headers()
+
+    def test_the_target_policy_is_stricter_than_the_current_one(self):
+        """The current policy names CDN hosts as a concession; the target does
+        not. If these ever converge, the concession has been removed."""
+        from app.security.headers import CURRENT_CSP, TARGET_CSP
+
+        assert "cdn.tailwindcss.com" in CURRENT_CSP
+        assert "cdn.tailwindcss.com" not in TARGET_CSP
+        assert "'unsafe-inline'" not in TARGET_CSP.split("style-src")[0]

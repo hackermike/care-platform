@@ -10,6 +10,7 @@ from app.forms import FormError
 from app.routers import admin, auth, dashboards, pages, portal, practice
 from app.security.csrf import CSRFError
 from app.security.deps import csrf_protect
+from app.security.headers import SecurityHeadersMiddleware
 from app.security.middleware import CSRFTokenMiddleware
 from app.tenancy import CrossTenantError, TenantResolutionError
 
@@ -29,6 +30,9 @@ app = FastAPI(
     dependencies=[Depends(csrf_protect)],
 )
 app.add_middleware(CSRFTokenMiddleware)
+# Added last so it runs outermost: every response, including error responses
+# produced by the exception handlers below, carries the headers.
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(pages.router)
 app.include_router(auth.router)
