@@ -8,6 +8,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import false
 
 from app.database import Base
 from app.models.money import Money, to_float
@@ -54,7 +55,7 @@ class Appointment(Base):
     duration_minutes = Column(Integer, nullable=True)
 
     status = Column(String, nullable=False, default=STATUS_SCHEDULED)
-    written_off = Column(Boolean, nullable=False, default=False, server_default="0")
+    written_off = Column(Boolean, nullable=False, default=False, server_default=false())
 
     # Exact storage; exposed as float at the breakout-core boundary (models/money.py).
     fee_amount = Column(Money, nullable=True)

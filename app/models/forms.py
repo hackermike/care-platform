@@ -9,6 +9,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import false, true
 
 from app.database import Base
 
@@ -49,9 +50,9 @@ class FormTemplate(Base):
     schema_json = Column(Text, nullable=True)
 
     requires_signature = Column(
-        Boolean, nullable=False, default=False, server_default="0"
+        Boolean, nullable=False, default=False, server_default=false()
     )
-    is_active = Column(Boolean, nullable=False, default=True, server_default="1")
+    is_active = Column(Boolean, nullable=False, default=True, server_default=true())
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

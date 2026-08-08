@@ -25,20 +25,37 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _backfill(table: str, column: str, value) -> None:
+    """Set a newly added column on existing rows, before making it NOT NULL.
+
+    Built as a SQLAlchemy construct rather than raw SQL so the literal renders
+    per dialect — the raw form (`SET is_active = 1`) passes on SQLite and fails
+    on Postgres, which is the kind of difference that only shows up in
+    production.
+    """
+    target = sa.table(table, sa.column(column))
+    op.execute(target.update().where(target.c[column].is_(None)).values(**{column: value}))
+
+
 def upgrade() -> None:
     # batch_alter_table throughout: on Postgres it emits plain ALTERs, and on
     # SQLite it falls back to table-rebuild. Keeping it portable lets the test
     # suite run the migration chain without a Postgres instance.
+    #
+    # Boolean values use sa.true()/sa.false() rather than 1/0. SQLite has no
+    # boolean type and accepts the integers; Postgres has a real one and rejects
+    # them outright ("column is of type boolean but expression is of type
+    # integer"). The SQLAlchemy constructs render correctly for each dialect.
 
     # --- tenants: white-label branding + activation -------------------------
     op.add_column("tenants", sa.Column("is_active", sa.Boolean(), nullable=True))
-    op.execute("UPDATE tenants SET is_active = 1 WHERE is_active IS NULL")
+    _backfill("tenants", "is_active", sa.true())
     with op.batch_alter_table("tenants") as batch:
         batch.alter_column(
             "is_active",
             existing_type=sa.Boolean(),
             nullable=False,
-            server_default=sa.text("1"),
+            server_default=sa.true(),
         )
     op.add_column("tenants", sa.Column("brand_name", sa.String(), nullable=True))
     op.add_column("tenants", sa.Column("brand_color", sa.String(), nullable=True))
@@ -56,20 +73,20 @@ def upgrade() -> None:
     op.add_column(
         "users", sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True)
     )
-    op.execute("UPDATE users SET is_active = 1 WHERE is_active IS NULL")
-    op.execute("UPDATE users SET failed_login_count = 0 WHERE failed_login_count IS NULL")
+    _backfill("users", "is_active", sa.true())
+    _backfill("users", "failed_login_count", sa.literal(0))
     with op.batch_alter_table("users") as batch:
         batch.alter_column(
             "is_active",
             existing_type=sa.Boolean(),
             nullable=False,
-            server_default=sa.text("1"),
+            server_default=sa.true(),
         )
         batch.alter_column(
             "failed_login_count",
             existing_type=sa.Integer(),
             nullable=False,
-            server_default=sa.text("0"),
+            server_default=sa.literal(0),
         )
         # Email is unique per tenant, not globally: the same person may be a
         # client of one network and a therapist in another.

@@ -1,4 +1,5 @@
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, func
+from sqlalchemy.sql import true
 
 from app.database import Base
 
@@ -17,7 +18,7 @@ class Tenant(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     slug = Column(String, nullable=False, unique=True)
-    is_active = Column(Boolean, nullable=False, default=True, server_default="1")
+    is_active = Column(Boolean, nullable=False, default=True, server_default=true())
 
     # White-label presentation. brand_name falls back to name when unset.
     brand_name = Column(String, nullable=True)

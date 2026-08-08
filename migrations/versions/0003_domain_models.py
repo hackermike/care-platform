@@ -112,7 +112,7 @@ def upgrade() -> None:
         sa.Column("duration_minutes", sa.Integer(), nullable=True),
         sa.Column("status", sa.String(), nullable=False),
         sa.Column(
-            "written_off", sa.Boolean(), nullable=False, server_default=sa.text("0")
+            "written_off", sa.Boolean(), nullable=False, server_default=sa.false()
         ),
         sa.Column("fee_amount", MONEY, nullable=True),
         sa.Column("cpt_code", sa.String(), nullable=True),
@@ -140,7 +140,7 @@ def upgrade() -> None:
         sa.Column("amount_value", MONEY, nullable=False),
         sa.Column("servicer_fee_value", MONEY, nullable=True),
         sa.Column(
-            "is_refund", sa.Boolean(), nullable=False, server_default=sa.text("0")
+            "is_refund", sa.Boolean(), nullable=False, server_default=sa.false()
         ),
         sa.Column("method", sa.String(), nullable=True),
         sa.Column("reference", sa.String(), nullable=True),
