@@ -67,7 +67,7 @@ async def create_therapist(
     user: User = Depends(require_admin),
     scope: TenantScope = Depends(get_scope),
 ):
-    account = scope.get(User, int(user_id))
+    account = scope.get(User, forms.parse_int(user_id, "Account"))
     if account is None:
         return _not_found()
     try:

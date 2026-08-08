@@ -35,7 +35,14 @@ def _safe_next(candidate: str | None) -> str | None:
     """
     if not candidate:
         return None
-    if not candidate.startswith("/") or candidate.startswith("//"):
+    # Reject anything a browser might read as scheme-relative. "//host" is the
+    # obvious form; "/\\host" and "/\t/host" are the ones that get missed,
+    # because some browsers normalise a backslash to a slash before resolving.
+    if not candidate.startswith("/"):
+        return None
+    if candidate[1:2] in ("/", "\\"):
+        return None
+    if any(ch in candidate for ch in ("\\", "\t", "\r", "\n")):
         return None
     return candidate
 

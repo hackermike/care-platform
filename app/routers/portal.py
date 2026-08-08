@@ -15,7 +15,7 @@ from breakout_core.superbill import build_superbill_pdf
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import RedirectResponse, Response
 
-from app import audit, phi
+from app import audit, downloads, phi
 from app import forms as form_parsing
 from app.auth.dependencies import require_client
 from app.models.appointment import Appointment
@@ -218,7 +218,7 @@ async def statement(
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={
-            "content-disposition": f'attachment; filename="statement-{start_date}-{end_date}.pdf"'
-        },
+        headers=downloads.attachment_headers(
+            f"statement-{start_date}-{end_date}.pdf", fallback="statement.pdf"
+        ),
     )

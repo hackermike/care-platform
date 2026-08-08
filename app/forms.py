@@ -133,6 +133,22 @@ def parse_cpt(value: str | None) -> str:
     return text
 
 
+def parse_int(value: str | None, field: str) -> int:
+    """Parse an integer from a form.
+
+    Routes take form values as strings; a bare `int(...)` on one raises
+    ValueError straight out of the handler and becomes a 500 for what is user
+    input.
+    """
+    text = (value or "").strip()
+    if not text:
+        raise FormError(f"{field} is required.")
+    try:
+        return int(text)
+    except ValueError as exc:
+        raise FormError(f"{field} is not valid.") from exc
+
+
 def parse_choice(value: str | None, allowed, field: str, *, default=None):
     text = (value or "").strip()
     if not text and default is not None:
