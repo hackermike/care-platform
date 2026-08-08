@@ -2,6 +2,11 @@
 from app.models.appointment import Appointment  # noqa: F401
 from app.models.audit import AuditLog  # noqa: F401
 from app.models.client import Client  # noqa: F401
+from app.models.forms import (  # noqa: F401
+    FormAssignment,
+    FormSubmission,
+    FormTemplate,
+)
 from app.models.note import ClinicalNote, NoteAddendum  # noqa: F401
 from app.models.payment import Payment  # noqa: F401
 from app.models.provider import TherapistLicense, TherapistProfile  # noqa: F401

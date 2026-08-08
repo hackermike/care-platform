@@ -77,6 +77,35 @@
     </section>
 
     <section>
+      <h2 class="font-semibold">Portal forms</h2>
+      <ul class="mt-3 text-sm">
+        {% for assignment in assignments %}
+        <li class="border-b py-2">
+          {{ assignment.template.name }} —
+          {% if assignment.is_complete %}completed{% else %}awaiting client{% endif %}
+        </li>
+        {% else %}
+        <li class="py-2 text-gray-500">None assigned.</li>
+        {% endfor %}
+      </ul>
+      {% if form_templates %}
+      <form method="post" action="/app/clients/{{ client.id }}/forms" class="mt-3 flex gap-2">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}" />
+        <select name="template_id" class="flex-1 rounded border px-3 py-2">
+          {% for template in form_templates %}
+          <option value="{{ template.id }}">{{ template.name }}</option>
+          {% endfor %}
+        </select>
+        <button class="rounded border px-3 py-2">Assign</button>
+      </form>
+      {% else %}
+      <p class="mt-2 text-xs text-gray-500">
+        No form templates yet — add one with <code>dev-scripts/manage.py</code>.
+      </p>
+      {% endif %}
+    </section>
+
+    <section>
       <h2 class="font-semibold">Superbill</h2>
       <form method="get" action="/app/clients/{{ client.id }}/superbill" class="mt-3 space-y-3">
         <div class="grid grid-cols-2 gap-3">

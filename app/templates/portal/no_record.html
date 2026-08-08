@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ tenant.display_name }}{% endblock %}
+{% block content %}
+<main class="max-w-2xl mx-auto p-10">
+  <h1 class="text-2xl font-semibold">Welcome</h1>
+  <p class="mt-3 text-gray-600">
+    Your account is set up, but it is not linked to a client record yet. Your
+    therapist's office will connect it — there is nothing for you to do.
+  </p>
+  {% if tenant.support_email %}
+  <p class="mt-4 text-sm text-gray-500">
+    Questions? <a class="underline" href="mailto:{{ tenant.support_email }}">{{ tenant.support_email }}</a>
+  </p>
+  {% endif %}
+</main>
+{% endblock %}

@@ -15,6 +15,7 @@ from app import forms, licensure, phi
 from app.auth.dependencies import require_therapist
 from app.models.appointment import STATUSES, Appointment
 from app.models.client import Client
+from app.models.forms import FormAssignment, FormTemplate
 from app.models.money import to_decimal
 from app.models.note import KIND_PROGRESS, KIND_PSYCHOTHERAPY, KINDS
 from app.models.payment import METHODS
@@ -81,6 +82,19 @@ async def client_detail(
     if actor.profile is not None:
         licence = licensure.check(actor.profile, client.state)
 
+    form_templates = (
+        scope.query(FormTemplate)
+        .filter(FormTemplate.is_active.is_(True))
+        .order_by(FormTemplate.name)
+        .all()
+    )
+    assignments = (
+        scope.query(FormAssignment)
+        .filter(FormAssignment.client_id == client.id)
+        .order_by(FormAssignment.assigned_at.desc())
+        .all()
+    )
+
     return templates.TemplateResponse(
         request,
         "practice/client_detail.html",
@@ -89,6 +103,7 @@ async def client_detail(
             "client": client, "appointments": appointments,
             "balance": balance, "collected": collected, "licence": licence,
             "statuses": STATUSES, "cpt_codes": cpt.BOOKABLE,
+            "form_templates": form_templates, "assignments": assignments,
         },
     )
 
@@ -320,6 +335,55 @@ async def add_payment(
     scope.commit()
     return RedirectResponse(
         url=f"/app/appointments/{appointment.id}", status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@router.post("/clients/{client_id}/forms")
+async def assign_form(
+    client_id: int,
+    request: Request,
+    template_id: str = Form(...),
+    user: User = Depends(require_therapist),
+    scope: TenantScope = Depends(get_scope),
+):
+    """Give a client a form to complete in the portal.
+
+    Assignment is explicit rather than "every active template applies to
+    everyone": which paperwork a client owes is an administrative decision, and
+    showing someone consent documents that do not apply to them is worse than
+    showing none.
+    """
+    actor = _actor(scope, user)
+    client = practice.get_client(scope, actor, client_id)
+    if client is None:
+        return _not_found()
+
+    template = scope.get(FormTemplate, int(template_id))
+    if template is None or not template.is_active:
+        return Response(
+            "Unknown form template.", status_code=status.HTTP_400_BAD_REQUEST
+        )
+
+    existing = (
+        scope.query(FormAssignment)
+        .filter(
+            FormAssignment.client_id == client.id,
+            FormAssignment.template_id == template.id,
+            FormAssignment.completed_at.is_(None),
+        )
+        .first()
+    )
+    if existing is None:
+        assignment = FormAssignment(client_id=client.id, template_id=template.id)
+        scope.add(assignment)
+        scope.flush()
+        phi.modified(
+            scope.db, user, "form_assignment", assignment.id,
+            request=request, detail=f"template={template.id}",
+        )
+    scope.commit()
+    return RedirectResponse(
+        url=f"/app/clients/{client.id}", status_code=status.HTTP_303_SEE_OTHER
     )
 
 

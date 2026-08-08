@@ -1,12 +1,12 @@
-"""The three role surfaces.
+"""Role landing pages.
 
-Placeholder landing pages for now — their purpose in M1 is to prove that role
-enforcement and tenant scoping actually hold. Features land on them in M3+
-(see docs/MILESTONES.md).
+The therapist surface links into `app/routers/practice.py`; the client surface
+lives in `app/routers/portal.py` and is not routed from here. What remains is
+the admin landing page, whose features arrive in M8.
 """
 from fastapi import APIRouter, Depends, Request
 
-from app.auth.dependencies import require_admin, require_client, require_therapist
+from app.auth.dependencies import require_admin, require_therapist
 from app.models.session import UserSession
 from app.models.user import User
 from app.templates_config import templates
@@ -24,19 +24,6 @@ async def therapist_home(
     return templates.TemplateResponse(
         request,
         "dashboards/therapist.html",
-        {"request": request, "user": user, "tenant": scope.tenant},
-    )
-
-
-@router.get("/portal")
-async def client_portal(
-    request: Request,
-    user: User = Depends(require_client),
-    scope: TenantScope = Depends(get_scope),
-):
-    return templates.TemplateResponse(
-        request,
-        "dashboards/client.html",
         {"request": request, "user": user, "tenant": scope.tenant},
     )
 

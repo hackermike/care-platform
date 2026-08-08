@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ tenant.display_name }}{% endblock %}
+{% block content %}
+<main class="max-w-3xl mx-auto p-10">
+  <h1 class="text-2xl font-semibold">Welcome, {{ client.first_name }}</h1>
+
+  {% if pending %}
+  <section class="mt-8">
+    <h2 class="font-semibold">Forms to complete</h2>
+    <ul class="mt-3 space-y-2">
+      {% for assignment in pending %}
+      <li class="rounded border bg-white p-4 flex items-center justify-between">
+        <span>
+          {{ assignment.template.name }}
+          {% if assignment.template.requires_signature %}
+          <span class="ml-2 text-xs text-gray-500">signature required</span>
+          {% endif %}
+        </span>
+        <a class="rounded bg-gray-900 px-3 py-1 text-sm text-white"
+           href="/portal/forms/{{ assignment.id }}">Open</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% else %}
+  <p class="mt-6 text-gray-600">You have no forms to complete.</p>
+  {% endif %}
+
+  {% if completed %}
+  <section class="mt-10">
+    <h2 class="font-semibold">Completed</h2>
+    <ul class="mt-3 space-y-2 text-sm">
+      {% for submission in completed %}
+      <li class="rounded border bg-white p-3">
+        {{ submission.template.name }}
+        {% if submission.is_signed %}
+          — signed by {{ submission.signature_name }}
+          on {{ submission.signed_at.strftime("%d %B %Y") }}
+        {% else %}
+          — submitted {{ submission.submitted_at.strftime("%d %B %Y") if submission.submitted_at }}
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <section class="mt-10">
+    <h2 class="font-semibold">Billing</h2>
+    <p class="mt-2 text-sm text-gray-600">
+      Charged ${{ "%.2f"|format(balance.charged) }} ·
+      paid ${{ "%.2f"|format(balance.paid) }} ·
+      outstanding <strong>${{ "%.2f"|format(balance.outstanding) }}</strong>
+    </p>
+    <form method="get" action="/portal/statement" class="mt-3 flex gap-3 items-end">
+      <div>
+        <label class="block text-xs text-gray-500" for="start">From</label>
+        <input id="start" name="start" type="date" class="rounded border px-3 py-2" />
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500" for="end">To</label>
+        <input id="end" name="end" type="date" class="rounded border px-3 py-2" />
+      </div>
+      <button class="rounded border px-3 py-2">Download statement</button>
+    </form>
+    <p class="mt-2 text-xs text-gray-500">
+      An itemised statement you can submit to your insurer. Blank dates cover
+      this year so far.
+    </p>
+  </section>
+
+  {% if appointments %}
+  <section class="mt-10">
+    <h2 class="font-semibold">Sessions</h2>
+    <ul class="mt-3 text-sm">
+      {% for appt in appointments %}
+      <li class="border-b py-2">
+        {{ appt.starts_at.strftime("%d %B %Y, %H:%M") }} — {{ appt.status }}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</main>
+{% endblock %}
