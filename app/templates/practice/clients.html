@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Caseload — {{ tenant.display_name }}{% endblock %}
+{% block content %}
+<main class="max-w-5xl mx-auto p-10">
+  <h1 class="text-2xl font-semibold">Caseload</h1>
+  <p class="mt-1 text-sm text-gray-500">
+    {% if actor.is_admin %}All clients in {{ tenant.display_name }}.
+    {% else %}Your clients.{% endif %}
+  </p>
+
+  <table class="mt-6 w-full text-sm bg-white rounded border">
+    <thead class="text-left text-gray-500 border-b">
+      <tr><th class="p-3">Name</th><th class="p-3">State</th><th class="p-3">Diagnosis</th></tr>
+    </thead>
+    <tbody>
+      {% for client in clients %}
+      <tr class="border-b last:border-0">
+        <td class="p-3">
+          <a class="underline" href="/app/clients/{{ client.id }}">{{ client.patient_name }}</a>
+        </td>
+        <td class="p-3">{{ client.state or "—" }}</td>
+        <td class="p-3">{{ client.diagnosis_codes or "—" }}</td>
+      </tr>
+      {% else %}
+      <tr><td class="p-3 text-gray-500" colspan="3">No clients yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <section class="mt-10 max-w-md">
+    <h2 class="font-semibold">Add a client</h2>
+    <form method="post" action="/app/clients" class="mt-3 space-y-3">
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}" />
+      <div class="grid grid-cols-2 gap-3">
+        <input name="first_name" required placeholder="First name" class="rounded border px-3 py-2" />
+        <input name="last_name" required placeholder="Last name" class="rounded border px-3 py-2" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <input name="state" maxlength="2" placeholder="State (e.g. CA)" class="rounded border px-3 py-2 uppercase" />
+        <input name="diagnosis_codes" placeholder="ICD-10 (e.g. F41.1)" class="rounded border px-3 py-2" />
+      </div>
+      <input name="email" type="email" placeholder="Email (optional)" class="w-full rounded border px-3 py-2" />
+      <button class="rounded bg-gray-900 px-3 py-2 text-white">Add client</button>
+    </form>
+    <p class="mt-2 text-xs text-gray-500">
+      State is required before booking — licensure is checked against it.
+    </p>
+  </section>
+</main>
+{% endblock %}
