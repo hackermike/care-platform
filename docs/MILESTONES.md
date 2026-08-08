@@ -138,12 +138,30 @@ The largest milestone by a wide margin.
 Credentialing is an operational business as much as a data model. Scope it as
 such when the milestone is planned in detail.
 
-## M8 — Admin surface at scale
+## M8 — Admin surface at scale ✅
 
 Multiple admins, thousands of therapists: therapist onboarding, state licensure
 records, **client-state vs. therapist-licensure validation at booking** (the
 engineering residue of the state-agnostic decision), roster management, and
 reporting.
+
+**Shipped** (out of numeric order — M5/M6 need BAA-covered vendors that have to
+be contracted before they can be built). `app/routers/admin.py`,
+`app/services/roster.py`.
+
+- Roster is **paginated and searchable from the start**, and caseload counts are
+  fetched in one grouped query rather than per row. At the stated scale of
+  thousands of therapists, a page that loads them all is not a later problem.
+- **Expiring licences are surfaced** on the roster. A lapsed licence means a
+  therapist may be seeing clients they cannot lawfully see, and nobody notices
+  unless something checks — that is the reason for storing expiry at all.
+- **The audit log is readable by admins.** A log nobody can read is a compliance
+  artefact rather than a control.
+
+This milestone also closed a real hole in `app/tenancy.py`: `scope.query()` only
+accepted a whole model, so a tenant-scoped aggregate was impossible to express
+and counting would have been the one operation that escaped the boundary. It now
+takes columns and aggregates, scoping from the first entity, with tests.
 
 ## Not in this plan
 

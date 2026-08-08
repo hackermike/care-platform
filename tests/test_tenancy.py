@@ -116,3 +116,42 @@ class TestSubdomainResolution:
 
         monkeypatch.setattr(config, "TENANT_HOST_SUFFIX", "")
         assert subdomain_for("acme.example.com") is None
+
+
+class TestScopedAggregates:
+    """Counting must not be the one operation that escapes the tenant boundary."""
+
+    def test_a_column_query_is_scoped(self, db, two_tenants):
+        alpha, beta = two_tenants
+        rows = TenantScope(db, alpha).query(User.email).all()
+        assert {r[0] for r in rows} == {"a1@example.com", "a2@example.com"}
+
+    def test_an_aggregate_is_scoped(self, db, two_tenants):
+        from sqlalchemy import func
+
+        alpha, beta = two_tenants
+        scoped = TenantScope(db, alpha).query(
+            User.tenant_id, func.count(User.id)
+        ).group_by(User.tenant_id).all()
+        assert scoped == [(alpha.id, 2)]
+
+    def test_scoping_is_taken_from_the_first_entity(self, db, two_tenants):
+        from sqlalchemy import func
+
+        alpha, _ = two_tenants
+        # func.count() carries no tenant, so the first entity must be the one
+        # that decides — otherwise this query would silently span tenants.
+        total = TenantScope(db, alpha).query(User.id, func.count(User.id)).group_by(
+            User.id
+        ).count()
+        assert total == 2
+
+    def test_an_unscoped_first_entity_is_refused(self, db, two_tenants):
+        alpha, _ = two_tenants
+        with pytest.raises(CrossTenantError):
+            TenantScope(db, alpha).query(Tenant.name)
+
+    def test_an_empty_query_is_refused(self, db, two_tenants):
+        alpha, _ = two_tenants
+        with pytest.raises(CrossTenantError):
+            TenantScope(db, alpha).query()

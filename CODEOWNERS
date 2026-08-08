@@ -1,0 +1,20 @@
+# Every change needs the owner's review. With a branch ruleset that requires
+# review from Code Owners, this is what stops an unapproved merge — including
+# from a fork.
+#
+# The security-critical paths are listed separately not because the rule differs
+# today, but so that adding a second maintainer later cannot accidentally hand
+# over tenant isolation or authentication along with everything else.
+
+* @hackermike
+
+# Tenant isolation, auth, and audit — a mistake here is a PHI disclosure.
+/app/tenancy.py      @hackermike
+/app/auth/           @hackermike
+/app/security/       @hackermike
+/app/audit.py        @hackermike
+/app/phi.py          @hackermike
+/migrations/         @hackermike
+
+# Workflow definitions run with repository permissions.
+/.github/            @hackermike

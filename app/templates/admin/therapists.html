@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Therapists — {{ tenant.display_name }}{% endblock %}
+{% block content %}
+<main class="max-w-5xl mx-auto p-10">
+  <a class="text-sm text-gray-500 underline" href="/admin">← Administration</a>
+  <h1 class="mt-2 text-2xl font-semibold">Therapists</h1>
+  <p class="mt-1 text-sm text-gray-500">{{ results.total }} in {{ tenant.display_name }}.</p>
+
+  {% if expiring %}
+  <div role="alert" class="mt-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    <strong>{{ expiring|length }} licence(s) expired or expiring within 60 days.</strong>
+    A lapsed licence means a therapist may be seeing clients they cannot lawfully see.
+    <ul class="mt-2 list-disc pl-5">
+      {% for licence in expiring %}
+      <li>
+        <a class="underline" href="/admin/therapists/{{ licence.therapist_id }}">
+          {{ licence.therapist.name or "Therapist " ~ licence.therapist_id }}
+        </a>
+        — {{ licence.state }}, expires {{ licence.expires_on.strftime("%d %b %Y") }}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form method="get" action="/admin/therapists" class="mt-6 flex gap-2 max-w-md">
+    <input name="q" value="{{ q }}" placeholder="Search name, NPI, or email"
+           class="flex-1 rounded border px-3 py-2" />
+    <button class="rounded border px-3 py-2">Search</button>
+  </form>
+
+  <table class="mt-6 w-full text-sm bg-white rounded border">
+    <thead class="text-left text-gray-500 border-b">
+      <tr>
+        <th class="p-3">Name</th><th class="p-3">Credentials</th>
+        <th class="p-3">NPI</th><th class="p-3">States</th><th class="p-3">Clients</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for therapist in results.items %}
+      <tr class="border-b last:border-0">
+        <td class="p-3">
+          <a class="underline" href="/admin/therapists/{{ therapist.id }}">
+            {{ therapist.name or "(unnamed)" }}
+          </a>
+        </td>
+        <td class="p-3">{{ therapist.credentials or "—" }}</td>
+        <td class="p-3">{{ therapist.npi or "—" }}</td>
+        <td class="p-3">{{ therapist.licenses|map(attribute="state")|join(", ") or "—" }}</td>
+        <td class="p-3">{{ counts.get(therapist.id, 0) }}</td>
+      </tr>
+      {% else %}
+      <tr><td class="p-3 text-gray-500" colspan="5">No therapists yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if results.pages > 1 %}
+  <nav class="mt-4 flex gap-3 text-sm">
+    {% if results.has_previous %}
+    <a class="underline" href="/admin/therapists?page={{ results.page - 1 }}&q={{ q }}">← Previous</a>
+    {% endif %}
+    <span class="text-gray-500">Page {{ results.page }} of {{ results.pages }}</span>
+    {% if results.has_next %}
+    <a class="underline" href="/admin/therapists?page={{ results.page + 1 }}&q={{ q }}">Next →</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+
+  <section class="mt-10 max-w-md">
+    <h2 class="font-semibold">Add a clinical profile</h2>
+    {% if unassigned %}
+    <p class="mt-1 text-xs text-gray-500">
+      Turns an existing therapist account into someone who can appear on a
+      superbill or a claim.
+    </p>
+    <form method="post" action="/admin/therapists" class="mt-3 space-y-3">
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}" />
+      <select name="user_id" required class="w-full rounded border px-3 py-2">
+        {% for account in unassigned %}
+        <option value="{{ account.id }}">{{ account.email }}</option>
+        {% endfor %}
+      </select>
+      <input name="name" required placeholder="Full name" class="w-full rounded border px-3 py-2" />
+      <div class="grid grid-cols-2 gap-3">
+        <input name="credentials" placeholder="Credentials (LCSW)" class="rounded border px-3 py-2" />
+        <input name="npi" placeholder="NPI" class="rounded border px-3 py-2" />
+      </div>
+      <input name="practice_name" placeholder="Practice name" class="w-full rounded border px-3 py-2" />
+      <button class="rounded bg-gray-900 px-3 py-2 text-white">Create profile</button>
+    </form>
+    {% else %}
+    <p class="mt-2 text-sm text-gray-500">
+      Every therapist account already has a profile. Create accounts with
+      <code>dev-scripts/manage.py create-user</code>.
+    </p>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}

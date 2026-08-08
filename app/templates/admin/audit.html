@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Audit log — {{ tenant.display_name }}{% endblock %}
+{% block content %}
+<main class="max-w-5xl mx-auto p-10">
+  <a class="text-sm text-gray-500 underline" href="/admin">← Administration</a>
+  <h1 class="mt-2 text-2xl font-semibold">Audit log</h1>
+  <p class="mt-1 text-sm text-gray-500">
+    {{ results.total }} entries for {{ tenant.display_name }}. Records who
+    accessed what and when — never the content itself.
+  </p>
+
+  <form method="get" action="/admin/audit" class="mt-6 flex gap-2 max-w-md">
+    <select name="action" class="flex-1 rounded border px-3 py-2">
+      <option value="">All actions</option>
+      {% for value in ["phi.viewed", "phi.modified", "auth.login.succeeded",
+                       "auth.login.failed", "auth.logout", "authz.access.denied"] %}
+      <option value="{{ value }}" {% if action == value %}selected{% endif %}>{{ value }}</option>
+      {% endfor %}
+    </select>
+    <button class="rounded border px-3 py-2">Filter</button>
+  </form>
+
+  <table class="mt-6 w-full text-sm bg-white rounded border">
+    <thead class="text-left text-gray-500 border-b">
+      <tr>
+        <th class="p-3">When</th><th class="p-3">Who</th><th class="p-3">Action</th>
+        <th class="p-3">Resource</th><th class="p-3">Detail</th><th class="p-3">IP</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in results.items %}
+      <tr class="border-b last:border-0">
+        <td class="p-3 whitespace-nowrap">
+          {{ entry.created_at.strftime("%Y-%m-%d %H:%M") if entry.created_at else "—" }}
+        </td>
+        <td class="p-3">{{ actors.get(entry.user_id, "—") }}</td>
+        <td class="p-3"><code>{{ entry.action }}</code></td>
+        <td class="p-3">
+          {% if entry.resource_type %}{{ entry.resource_type }} {{ entry.resource_id }}{% else %}—{% endif %}
+        </td>
+        <td class="p-3 text-gray-600">{{ entry.detail or "—" }}</td>
+        <td class="p-3 text-gray-500">{{ entry.ip_address or "—" }}</td>
+      </tr>
+      {% else %}
+      <tr><td class="p-3 text-gray-500" colspan="6">Nothing recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if results.pages > 1 %}
+  <nav class="mt-4 flex gap-3 text-sm">
+    {% if results.has_previous %}
+    <a class="underline" href="/admin/audit?page={{ results.page - 1 }}&action={{ action }}">← Newer</a>
+    {% endif %}
+    <span class="text-gray-500">Page {{ results.page }} of {{ results.pages }}</span>
+    {% if results.has_next %}
+    <a class="underline" href="/admin/audit?page={{ results.page + 1 }}&action={{ action }}">Older →</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+</main>
+{% endblock %}
