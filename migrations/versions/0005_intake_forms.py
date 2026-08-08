@@ -33,9 +33,9 @@ def upgrade() -> None:
             "requires_signature",
             sa.Boolean(),
             nullable=False,
-            server_default=sa.text("0"),
+            server_default=sa.false(),
         ),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
     op.create_index("ix_form_templates_tenant_id", "form_templates", ["tenant_id"])

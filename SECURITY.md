@@ -46,7 +46,6 @@ We will acknowledge within a few days. There is no bounty programme.
 - No encryption of PHI at rest beyond whatever the database host provides.
 - No password reset or account invitation flow (accounts are provisioned by CLI).
 - No rate limiting beyond login lockout.
-- Never yet exercised against PostgreSQL in CI — the test suite runs on SQLite.
 
 ## Reporting scope
 

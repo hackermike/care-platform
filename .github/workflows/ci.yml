@@ -11,6 +11,29 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    # The suite defaults to SQLite so contributors need nothing installed, but
+    # money is NUMERIC(10,2) and timestamps are timezone-aware — the two types
+    # where SQLite and Postgres genuinely differ. Production is Postgres, so CI
+    # proves it there too.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: care
+          POSTGRES_PASSWORD: care
+          POSTGRES_DB: care
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U care"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      PG_URL: postgresql+psycopg://care:care@localhost:5432/care
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,7 +41,19 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
+
       - name: Lint
         run: ruff check .
-      - name: Tests
+
+      - name: Tests (SQLite)
+        run: pytest -q
+
+      - name: Migrations apply and roll back on Postgres
+        env:
+          DATABASE_URL: ${{ env.PG_URL }}
+        run: ./dev-scripts/check-migrations.sh
+
+      - name: Tests (PostgreSQL)
+        env:
+          TEST_DATABASE_URL: ${{ env.PG_URL }}
         run: pytest -q

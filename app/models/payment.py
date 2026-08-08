@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import false
 
 from app.database import Base
 from app.models.money import Money, to_float
@@ -36,7 +37,7 @@ class Payment(Base):
     # Exact storage; float only at the breakout-core boundary (models/money.py).
     amount_value = Column(Money, nullable=False)
     servicer_fee_value = Column(Money, nullable=True)  # card-processor fee
-    is_refund = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_refund = Column(Boolean, nullable=False, default=False, server_default=false())
 
     method = Column(String, nullable=True)
     reference = Column(String, nullable=True)  # cheque number, processor id

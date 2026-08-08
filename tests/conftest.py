@@ -1,15 +1,30 @@
-"""Test fixtures. Tests run against a throwaway SQLite database (no Postgres
-needed); the app uses Postgres in real environments."""
+"""Test fixtures.
+
+By default the suite runs against a throwaway SQLite database, so a contributor
+needs no external services. **Set `TEST_DATABASE_URL` to run the same suite
+against PostgreSQL** — CI does both.
+
+Running both matters more here than it usually would: money is `Numeric(10, 2)`
+and timestamps are `DateTime(timezone=True)`, and those are exactly the two types
+where SQLite and Postgres disagree. SQLite has no native decimal or timestamp
+type and hands back naive datetimes, so a SQLite-only suite would prove very
+little about the columns that carry money and appointment times.
+"""
 import os
 import re
 import tempfile
 
 import pytest
 
-# Point at a temp SQLite DB *before* anything builds the engine.
-_TEST_DB = os.path.join(tempfile.mkdtemp(prefix="care-test-"), "test.db")
-os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB}"
+# Choose the backend *before* anything builds the engine.
+_TEST_DB_URL = os.environ.get("TEST_DATABASE_URL", "").strip()
+if not _TEST_DB_URL:
+    _TEST_DB = os.path.join(tempfile.mkdtemp(prefix="care-test-"), "test.db")
+    _TEST_DB_URL = f"sqlite:///{_TEST_DB}"
+os.environ["DATABASE_URL"] = _TEST_DB_URL
 os.environ.setdefault("APP_ENV", "dev")
+
+RUNNING_ON_POSTGRES = _TEST_DB_URL.startswith("postgresql")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -29,6 +44,10 @@ def reset_db():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
+    # Postgres holds connections open between tests; without disposing them a
+    # later drop_all can block on an idle transaction.
+    if RUNNING_ON_POSTGRES:
+        engine.dispose()
 
 
 @pytest.fixture

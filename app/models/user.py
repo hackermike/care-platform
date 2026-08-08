@@ -9,6 +9,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import true
 
 from app.database import Base
 
@@ -37,7 +38,7 @@ class User(Base):
     full_name = Column(String, nullable=True)
     role = Column(String, nullable=False, default=ROLE_THERAPIST)  # one of ROLES
     password_hash = Column(String, nullable=True)
-    is_active = Column(Boolean, nullable=False, default=True, server_default="1")
+    is_active = Column(Boolean, nullable=False, default=True, server_default=true())
 
     # Failed-login throttling state (app/config.py sets the thresholds).
     failed_login_count = Column(Integer, nullable=False, default=0, server_default="0")

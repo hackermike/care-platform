@@ -64,7 +64,6 @@ for the target shape.
 
 ## License
 
-**Undecided** — a deliberate call, not an oversight. Breakout Billing is
-AGPL-3.0; this platform's license depends on the business model in
-`docs/DECISIONS.md` (infrastructure-for-networks vs consumer product). No
-`LICENSE` file is committed yet; the repo is private until decided.
+[AGPL-3.0](LICENSE), matching Breakout Billing. The reciprocity is deliberate:
+anyone who hosts a modified version has to publish their changes. Commercial
+exceptions are available from the copyright holder.
