@@ -6,8 +6,12 @@ local therapist tool. This product serves a **network of therapists and their
 clients**: client-facing scheduling and intake, in-product sessions, and payments
 (insurance claims and/or sliding scale — see `docs/DECISIONS.md`).
 
-> **Status: scaffold.** Runnable skeleton + docs only. No product features yet.
-> Start with [`START-HERE.md`](START-HERE.md).
+> **Status: working foundation, not deployable for PHI.** Auth, tenant
+> isolation, the therapist flow, the client portal, and the admin roster are
+> built and tested. The operational surface around them — BAA-covered host, TLS,
+> secrets management, backups, email — is not. See
+> [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the specific gaps before
+> deploying anything against real patient data.
 
 The name is a placeholder — `docs/CONCEPT.md` weighs *Breakout Care* (infra) vs
 *Even Keel* (consumer). Run a USPTO + domain check before committing to one.
@@ -54,6 +58,9 @@ for the target shape.
 - [`docs/NEW-REPO-PLAN.md`](docs/NEW-REPO-PLAN.md) — why separate repo/session
 - [`docs/INTEGRATION.md`](docs/INTEGRATION.md) — breakout-core + JSON contract
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — target architecture
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — what must be plugged in before real PHI
+- [`SECURITY.md`](SECURITY.md) — threat model, what is and isn't implemented
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — conventions and non-negotiables
 
 ## License
 

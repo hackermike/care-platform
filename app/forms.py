@@ -9,7 +9,7 @@ message. Validation lives here rather than in the routes so the same input means
 the same thing everywhere, and so adding a field does not mean re-deciding how
 malformed input behaves.
 """
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 from decimal import Decimal, InvalidOperation
 
 from breakout_core import cpt
@@ -69,6 +69,19 @@ def parse_date(value: str | None, field: str):
         return datetime.fromisoformat(text).date()
     except ValueError as exc:
         raise FormError(f"{field} is not a valid date.") from exc
+
+
+def parse_date_as_utc(value: str | None, field: str) -> datetime | None:
+    """A `<input type="date">` value stored as an aware UTC datetime.
+
+    Columns like `expires_on` are `DateTime(timezone=True)` while the form gives
+    a bare date; midnight UTC is the unambiguous reading, and doing the
+    conversion here keeps `datetime` out of the route handlers.
+    """
+    parsed = parse_date(value, field)
+    if parsed is None:
+        return None
+    return datetime.combine(parsed, time(0, 0)).replace(tzinfo=UTC)
 
 
 def parse_money(value: str | None, field: str = "Amount", *, required: bool = True):

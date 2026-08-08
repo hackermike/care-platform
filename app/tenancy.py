@@ -35,6 +35,22 @@ def _model_is_tenant_owned(model) -> bool:
     return hasattr(model, "tenant_id")
 
 
+def _owning_model(entity):
+    """The mapped class behind a query entity.
+
+    A model maps to itself; a column attribute (`Client.therapist_id`) maps to
+    the class that declares it. Returns None for anything else — an aggregate
+    like `func.count(...)` carries no tenant, which is why scoping is always
+    taken from the first entity.
+    """
+    if isinstance(entity, type):
+        return entity
+    parent = getattr(entity, "parent", None)
+    if parent is not None and hasattr(parent, "class_"):
+        return parent.class_
+    return getattr(entity, "class_", None)
+
+
 def subdomain_for(host: str) -> str | None:
     """Extract a tenant slug from a request host.
 
@@ -70,20 +86,31 @@ class TenantScope:
     def tenant_id(self) -> int:
         return self.tenant.id
 
-    def query(self, model) -> Query:
+    def query(self, *entities) -> Query:
         """A query pre-filtered to this tenant.
 
-        Raises for models with no `tenant_id`: if a tenant-owned table is added
-        without the column, this surfaces it at the first query rather than
+        Accepts a model (`scope.query(Client)`) or columns and aggregates
+        (`scope.query(Client.therapist_id, func.count(Client.id))`). Scoping is
+        taken from the **first** entity, so an aggregate is filtered by the same
+        rule as a full-row query — without this, counting would have been the one
+        operation that quietly escaped the tenant boundary.
+
+        Raises for a first entity with no `tenant_id`: if a tenant-owned table is
+        added without the column, this surfaces at the first query rather than
         after the data has mixed.
         """
-        if not _model_is_tenant_owned(model):
+        if not entities:
+            raise CrossTenantError("query() needs at least one entity.")
+
+        model = _owning_model(entities[0])
+        if model is None or not _model_is_tenant_owned(model):
+            name = getattr(entities[0], "__name__", repr(entities[0]))
             raise CrossTenantError(
-                f"{model.__name__} has no tenant_id; it cannot be queried through a "
+                f"{name} has no tenant_id; it cannot be queried through a "
                 "TenantScope. Add the column, or use the session directly if the "
                 "table is genuinely platform-wide."
             )
-        return self.db.query(model).filter(model.tenant_id == self.tenant_id)
+        return self.db.query(*entities).filter(model.tenant_id == self.tenant_id)
 
     def get(self, model, pk):
         """Fetch by primary key, scoped. Returns None for another tenant's row.
