@@ -10,7 +10,7 @@ from app.forms import FormError
 from app.routers import admin, auth, dashboards, pages, portal, practice
 from app.security.csrf import CSRFError
 from app.security.deps import csrf_protect
-from app.security.headers import SecurityHeadersMiddleware
+from app.security.headers import SecurityHeadersMiddleware, apply_security_headers
 from app.security.middleware import CSRFTokenMiddleware
 from app.tenancy import CrossTenantError, TenantResolutionError
 
@@ -95,6 +95,26 @@ async def _bad_form_input(request: Request, exc: FormError):
 async def _csrf_failed(request: Request, exc: CSRFError):
     return PlainTextResponse(
         "CSRF validation failed.", status_code=status.HTTP_403_FORBIDDEN
+    )
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request: Request, exc: Exception):
+    """The 500 for anything no other handler caught.
+
+    Registered because Starlette builds that response in ServerErrorMiddleware,
+    which sits outside every user middleware — so SecurityHeadersMiddleware
+    never runs for it and the error page would ship with no CSP and no
+    X-Frame-Options. Registering this handler is what puts the response back
+    under our control.
+
+    The body is deliberately opaque: an exception message can carry a query, a
+    record id, or a fragment of PHI, and none of that belongs in a response.
+    """
+    return apply_security_headers(
+        PlainTextResponse(
+            "Internal error.", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     )
 
 

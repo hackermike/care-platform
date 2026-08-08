@@ -244,4 +244,42 @@ class TestSecurityHeaders:
 
         assert "cdn.tailwindcss.com" in CURRENT_CSP
         assert "cdn.tailwindcss.com" not in TARGET_CSP
-        assert "'unsafe-inline'" not in TARGET_CSP.split("style-src")[0]
+        # Assert the directives directly. Checking only the text before
+        # "style-src" would still pass for `style-src 'self' 'unsafe-inline'`.
+        assert "script-src 'self';" in TARGET_CSP
+        assert "style-src 'self';" in TARGET_CSP
+        assert "'unsafe-inline'" not in TARGET_CSP
+
+
+class TestHeadersOnUnhandledErrors:
+    """The gap CodeRabbit found: SecurityHeadersMiddleware cannot see a 500 that
+    Starlette's ServerErrorMiddleware builds, because that sits outside every
+    user middleware. Verified failing before the Exception handler was added."""
+
+    def _app_with_a_failing_route(self):
+        from fastapi.testclient import TestClient
+
+        from app.main import app
+
+        @app.get("/_test_boom")
+        async def _boom():  # pragma: no cover - exists to raise
+            raise RuntimeError("unhandled")
+
+        return TestClient(app, raise_server_exceptions=False)
+
+    def test_an_unhandled_exception_still_carries_the_headers(self, db):
+        client = self._app_with_a_failing_route()
+        r = client.get("/_test_boom")
+        assert r.status_code == 500
+        assert r.headers["x-frame-options"] == "DENY"
+        assert "content-security-policy" in r.headers
+        assert r.headers["referrer-policy"] == "no-referrer"
+
+    def test_the_error_body_reveals_nothing(self, db):
+        """An exception message can carry a query, a record id, or a fragment of
+        PHI. None of it belongs in a response."""
+        client = self._app_with_a_failing_route()
+        r = client.get("/_test_boom")
+        assert r.text == "Internal error."
+        assert "RuntimeError" not in r.text
+        assert "unhandled" not in r.text

@@ -91,10 +91,27 @@ def security_headers() -> dict[str, str]:
     return headers
 
 
+def apply_security_headers(response):
+    """Attach the headers to a response, without clobbering deliberate ones."""
+    for name, value in security_headers().items():
+        response.headers.setdefault(name, value)
+    return response
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Headers for every response the application itself produces.
+
+    **This cannot cover an unhandled exception.** When a route raises something
+    no handler catches, `call_next()` never returns a response — Starlette's
+    `ServerErrorMiddleware` builds the 500 from outside the entire user
+    middleware stack, so nothing here runs. `app.main` therefore also registers
+    an `Exception` handler, which is what `ServerErrorMiddleware` calls to build
+    that response, and which applies these headers itself.
+
+    Two mechanisms for one guarantee is unfortunate, but the alternative — an
+    ASGI wrapper around the finished app — means the object that gets served is
+    not the object the tests import, which is a worse trade.
+    """
+
     async def dispatch(self, request, call_next):
-        response = await call_next(request)
-        for name, value in security_headers().items():
-            # Do not clobber a header a route set deliberately.
-            response.headers.setdefault(name, value)
-        return response
+        return apply_security_headers(await call_next(request))
