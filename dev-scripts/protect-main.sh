@@ -9,11 +9,19 @@
 #
 # What it enforces:
 #   - changes reach main only through a pull request
-#   - at least one approving review, and stale approvals are dismissed on push
-#   - CODEOWNERS review required (see /CODEOWNERS)
-#   - the `test` check must pass
+#   - the `test` check must pass, against an up-to-date branch
 #   - no force pushes, no branch deletion
-#   - the rules apply to admins too, so there is no quiet bypass
+#   - review threads must be resolved before merging
+#
+# REQUIRED_APPROVALS defaults to 0. On a solo project 1 would mean you can never
+# merge anything: GitHub does not let you approve your own pull request, and
+# `enforce_admins` removes the bypass. That is a lockout, not a control. What
+# actually keeps an outside contributor from merging is that merging needs write
+# access at all — which a fork does not confer.
+#
+# Set it to 1 the day a second maintainer exists, which is also when CODEOWNERS
+# review starts meaning something:
+#   REQUIRED_APPROVALS=1 ./dev-scripts/protect-main.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -24,8 +32,11 @@ if [ "$(gh api "repos/${REPO}" --jq .private)" = "true" ]; then
   echo "paid plan; this will very likely fail with 403." >&2
 fi
 
-gh api -X PUT "repos/${REPO}/branches/main/protection" \
-  --input - <<'JSON'
+REQUIRED_APPROVALS="${REQUIRED_APPROVALS:-0}"
+# Code-owner review only means something once approvals are actually required.
+if [ "${REQUIRED_APPROVALS}" -gt 0 ]; then CODEOWNERS=true; else CODEOWNERS=false; fi
+
+cat > /tmp/protection.json <<JSON
 {
   "required_status_checks": {
     "strict": true,
@@ -34,8 +45,8 @@ gh api -X PUT "repos/${REPO}/branches/main/protection" \
   "enforce_admins": true,
   "required_pull_request_reviews": {
     "dismiss_stale_reviews": true,
-    "require_code_owner_reviews": true,
-    "required_approving_review_count": 1
+    "require_code_owner_reviews": ${CODEOWNERS},
+    "required_approving_review_count": ${REQUIRED_APPROVALS}
   },
   "restrictions": null,
   "allow_force_pushes": false,
@@ -44,8 +55,11 @@ gh api -X PUT "repos/${REPO}/branches/main/protection" \
 }
 JSON
 
-echo "Protected main on ${REPO}."
+gh api -X PUT "repos/${REPO}/branches/main/protection" --input /tmp/protection.json > /dev/null
+rm -f /tmp/protection.json
+
+echo "Protected main on ${REPO} (required approvals: ${REQUIRED_APPROVALS})."
 echo
-echo "Also set, in Settings -> Actions -> General:"
-echo "  'Require approval for all external contributors' — so a fork's PR"
-echo "  cannot run workflows until you approve them."
+echo "Then set, in Settings -> Actions -> General -> Fork pull request workflows:"
+echo "  'Require approval for all external contributors' — otherwise a fork's PR"
+echo "  runs your workflows before you have read the diff."
