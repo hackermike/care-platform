@@ -27,8 +27,7 @@ columns are no longer unverified on the production database.
 |---|---|
 | **Account invitation + password reset** | Accounts exist only via `dev-scripts/manage.py`, and a user who forgets their password cannot recover it. Needs a BAA-covered email provider (Postmark, SES) — note that even an invitation email is arguably PHI-adjacent, since it reveals a treatment relationship. |
 | **Per-user timezone** | Session times are stored UTC and entered as naive local, so a therapist booking 15:00 gets 15:00 UTC. Correct storage, wrong experience. |
-| **Tailwind precompiled** | `base.html` loads Tailwind from a CDN. That is a third-party request on a page rendering PHI, and it breaks with any strict CSP. Build the CSS. |
-| **Security headers + CSP** | No `Content-Security-Policy`, `Strict-Transport-Security`, or `X-Frame-Options` are set. |
+| **Local frontend assets** | `base.html` loads Tailwind *and* HTMX from CDNs, and the `htmx:configRequest` handler is inline. All three are third-party or inline execution on a page rendering PHI, and the CSP names those hosts and allows `'unsafe-inline'` to permit them. Unlocking `TARGET_CSP` in `app/security/headers.py` needs **all three**: precompile Tailwind, serve HTMX from the same origin, and move the inline handler to a file. Run `CSP_REPORT_ONLY=1` first to see what still violates. |
 | **Rate limiting** | Only login is throttled, per (tenant, email). Nothing limits request volume generally. |
 
 ## 3. Decided but not built
