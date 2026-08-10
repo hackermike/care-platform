@@ -18,7 +18,16 @@ import getpass
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _ROOT)
+
+# start.sh sources .env before launching the server; this script is run directly,
+# so it loads the same file. Without it, APP_ENV is unset — and since config.py
+# now defaults to production rather than dev, that is a startup error rather
+# than a silently relaxed local run.
+from dotenv import load_dotenv  # noqa: E402
+
+load_dotenv(os.path.join(_ROOT, ".env"))
 
 from app.auth.sessions import revoke_all_for_user  # noqa: E402
 from app.database import SessionLocal  # noqa: E402

@@ -35,6 +35,7 @@ EXPECTED_TABLES = {
     "form_templates",
     "form_assignments",
     "form_submissions",
+    "account_tokens",
 }
 
 

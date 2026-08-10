@@ -52,7 +52,8 @@ We will acknowledge within a few days. There is no bounty programme.
   repo — those belong to the deployment.
 - No BAA with any host, email, or SMS provider.
 - No encryption of PHI at rest beyond whatever the database host provides.
-- No password reset or account invitation flow (accounts are provisioned by CLI).
+- No email provider is configured, so invitation and password-reset links
+  cannot actually be delivered. The flows themselves are built and tested.
 - No rate limiting beyond login lockout.
 
 ## Reporting scope

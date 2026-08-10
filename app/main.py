@@ -7,7 +7,15 @@ import app.models  # noqa: F401 — registers models on Base
 from app.auth.dependencies import NotAuthenticated, login_redirect
 from app.db_init import run_migrations
 from app.forms import FormError
-from app.routers import admin, auth, dashboards, pages, portal, practice
+from app.routers import (
+    accounts,
+    admin,
+    auth,
+    dashboards,
+    pages,
+    portal,
+    practice,
+)
 from app.security.csrf import CSRFError
 from app.security.deps import csrf_protect
 from app.security.headers import SecurityHeadersMiddleware, apply_security_headers
@@ -36,6 +44,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(pages.router)
 app.include_router(auth.router)
+app.include_router(accounts.router)
 app.include_router(dashboards.router)
 app.include_router(practice.router)
 app.include_router(portal.router)

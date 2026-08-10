@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Reset your password — {{ tenant.display_name }}{% endblock %}
+{% block content %}
+<main class="max-w-sm mx-auto p-10">
+  <h1 class="text-xl font-semibold">{{ tenant.display_name }}</h1>
+
+  {% if sent %}
+  <div role="status" class="mt-6 rounded border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-800">
+    If that address has an account, a reset link is on its way. The link expires
+    in an hour.
+  </div>
+  <p class="mt-4 text-sm"><a class="underline" href="/login">Back to sign in</a></p>
+  {% else %}
+  <p class="mt-1 text-sm text-gray-500">
+    Enter your email address and we'll send you a link to set a new password.
+  </p>
+  <form method="post" action="/forgot" class="mt-6 space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}" />
+    <div>
+      <label for="email" class="block text-sm font-medium">Email</label>
+      <input id="email" name="email" type="email" required autocomplete="username"
+             class="mt-1 w-full rounded border px-3 py-2" />
+    </div>
+    <button type="submit" class="w-full rounded bg-gray-900 px-3 py-2 text-white">
+      Send reset link
+    </button>
+  </form>
+  <p class="mt-4 text-sm"><a class="underline" href="/login">Back to sign in</a></p>
+  {% endif %}
+</main>
+{% endblock %}

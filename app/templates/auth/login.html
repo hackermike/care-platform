@@ -29,6 +29,8 @@
     <button type="submit" class="w-full rounded bg-gray-900 px-3 py-2 text-white">Sign in</button>
   </form>
 
+  <p class="mt-4 text-sm"><a class="underline" href="/forgot">Forgot your password?</a></p>
+
   {% if tenant.support_email %}
   <p class="mt-6 text-xs text-gray-500">
     Trouble signing in? Contact <a class="underline" href="mailto:{{ tenant.support_email }}">{{ tenant.support_email }}</a>.
