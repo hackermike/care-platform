@@ -55,9 +55,11 @@ LOGIN_MAX_ATTEMPTS=5
 LOGIN_LOCKOUT_MINUTES=15
 ```
 
-`APP_ENV=dev` relaxes exactly two things: cookies are not marked `Secure` (no
-local TLS), and tenant resolution falls back to `DEV_DEFAULT_TENANT_SLUG`.
-Anything else is treated as a real environment.
+`APP_ENV` defaults to **production**, so an omitted variable fails closed rather
+than quietly enabling development behaviour. `APP_ENV=dev` relaxes exactly four
+things: cookies are not marked `Secure` (no local TLS), a placeholder
+`SECRET_KEY` is accepted, tenant resolution falls back to
+`DEV_DEFAULT_TENANT_SLUG`, and emailed links use `DEV_BASE_URL`.
 
 Migrations run on startup (`app/db_init.run_migrations()`), so a deploy applies
 them automatically. With more than one instance, run migrations as a separate

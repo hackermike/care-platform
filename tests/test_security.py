@@ -326,3 +326,72 @@ class TestHeadersOnUnhandledErrors:
         assert r.text == "Internal error."
         assert "RuntimeError" not in r.text
         assert "unhandled" not in r.text
+
+
+class TestConfigurationFailsClosed:
+    """A variable someone forgot to set must not silently enable dev behaviour.
+
+    `APP_ENV` used to default to "dev", so an omitted deployment variable
+    relaxed cookie flags, accepted a placeholder SECRET_KEY, enabled the
+    single-tenant host fallback, and pointed emailed links at localhost.
+    """
+
+    def _load_config(self, monkeypatch, env):
+        import importlib
+
+        for key in ("APP_ENV", "SECRET_KEY", "TENANT_HOST_SUFFIX"):
+            monkeypatch.delenv(key, raising=False)
+        for key, value in env.items():
+            monkeypatch.setenv(key, value)
+        import app.config
+
+        return importlib.reload(app.config)
+
+    def test_an_omitted_app_env_is_production(self, monkeypatch):
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            self._load_config(monkeypatch, {})
+
+    def test_production_refuses_the_placeholder_secret(self, monkeypatch):
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            self._load_config(
+                monkeypatch,
+                {"APP_ENV": "production", "SECRET_KEY": "dev-only-change-me"},
+            )
+
+    def test_production_requires_a_tenant_host_suffix(self, monkeypatch):
+        with pytest.raises(RuntimeError, match="TENANT_HOST_SUFFIX"):
+            self._load_config(
+                monkeypatch, {"APP_ENV": "production", "SECRET_KEY": "x" * 40}
+            )
+
+    def test_a_fully_configured_production_env_loads(self, monkeypatch):
+        config = self._load_config(
+            monkeypatch,
+            {
+                "APP_ENV": "production",
+                "SECRET_KEY": "x" * 40,
+                "TENANT_HOST_SUFFIX": "example.com",
+            },
+        )
+        assert not config.IS_DEV
+        assert config.COOKIE_SECURE is True
+
+    def test_dev_must_be_opted_into_explicitly(self, monkeypatch):
+        config = self._load_config(monkeypatch, {"APP_ENV": "dev"})
+        assert config.IS_DEV
+        assert config.COOKIE_SECURE is False
+
+    def test_the_errors_say_how_to_run_locally(self, monkeypatch):
+        with pytest.raises(RuntimeError, match="APP_ENV=dev"):
+            self._load_config(monkeypatch, {})
+
+    @pytest.fixture(autouse=True)
+    def _restore_config(self, monkeypatch):
+        """Reloading app.config mutates a module other tests import."""
+        yield
+        import importlib
+
+        monkeypatch.setenv("APP_ENV", "dev")
+        import app.config
+
+        importlib.reload(app.config)

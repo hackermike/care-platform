@@ -1,12 +1,21 @@
 """Runtime configuration, read from the environment.
 
-Secrets never have usable defaults in production. SECRET_KEY falls back to a
-development value only when APP_ENV is "dev"; anywhere else a missing key is a
-startup error rather than a silently insecure deployment.
+**Everything here fails closed.** `APP_ENV` defaults to production, so a variable
+someone forgot to set cannot silently turn on development behaviour; secrets and
+the tenant host suffix are startup errors rather than quietly insecure defaults.
+
+The dev relaxations are deliberately few and all gated on `IS_DEV`: cookies are
+not marked `Secure` (no local TLS), a placeholder `SECRET_KEY` is accepted, tenant
+resolution falls back to a default slug, and emailed links use `DEV_BASE_URL`.
 """
 import os
 
-APP_ENV = os.getenv("APP_ENV", "dev")
+# Defaults to production, not dev. An omitted APP_ENV should not quietly relax
+# cookie flags, accept a placeholder SECRET_KEY, enable the single-tenant host
+# fallback, and point emailed links at localhost — which is exactly what a "dev"
+# default did. Development opts in explicitly; `.env.example`, `start.sh` (via
+# .env), the test suite, and the smoke script all set it.
+APP_ENV = os.getenv("APP_ENV", "production").strip() or "production"
 IS_DEV = APP_ENV == "dev"
 
 _DEV_SECRET = "dev-only-change-me"
@@ -19,7 +28,9 @@ def _secret_key() -> str:
     if IS_DEV:
         return _DEV_SECRET
     raise RuntimeError(
-        "SECRET_KEY must be set to a real random value when APP_ENV is not 'dev'."
+        "SECRET_KEY must be set to a real random value when APP_ENV is not "
+        "'dev'. For local development set APP_ENV=dev (see .env.example); "
+        "in a real environment supply a random secret from your secrets manager."
     )
 
 
@@ -53,7 +64,8 @@ def _tenant_host_suffix() -> str:
         return suffix
     raise RuntimeError(
         "TENANT_HOST_SUFFIX must be set when APP_ENV is not 'dev'. Tenants "
-        "resolve by host subdomain, and emailed links are built from it."
+        "resolve by host subdomain, and emailed links are built from it. "
+        "For local development set APP_ENV=dev (see .env.example)."
     )
 
 
