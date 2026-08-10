@@ -41,10 +41,15 @@ def issued_secret(db, user, purpose=PURPOSE_RESET):
     return result.secret
 
 
+def open_link(client, purpose, secret):
+    """Follow the emailed link, which exchanges the secret for a cookie."""
+    return client.get(f"/{purpose}/{secret}", follow_redirects=True)
+
+
 def submit_password(client, purpose, secret, password, confirmation=None):
-    page = client.get(f"/{purpose}/{secret}")
+    page = open_link(client, purpose, secret)
     return client.post(
-        f"/{purpose}/{secret}",
+        f"/{purpose}",
         data={
             "password": password,
             "confirmation": confirmation if confirmation is not None else password,
@@ -139,7 +144,7 @@ class TestUsingALink:
     def test_a_link_cannot_be_reused(self, client, db, account):
         secret = issued_secret(db, account["user"])
         submit_password(client, "reset", secret, NEW_PASSWORD)
-        r = client.get(f"/reset/{secret}")
+        r = open_link(client, "reset", secret)
         assert r.status_code == 404
         assert "no longer valid" in r.text
 
@@ -149,30 +154,30 @@ class TestUsingALink:
         first = issued_secret(db, account["user"])
         second = issued_secret(db, account["user"])
         submit_password(client, "reset", first, NEW_PASSWORD)
-        assert client.get(f"/reset/{second}").status_code == 404
+        assert open_link(client, "reset", second).status_code == 404
 
     def test_an_expired_link_is_refused(self, client, db, account):
         secret = issued_secret(db, account["user"])
         token = db.query(AccountToken).one()
         token.expires_at = utcnow() - timedelta(minutes=1)
         db.commit()
-        assert client.get(f"/reset/{secret}").status_code == 404
+        assert open_link(client, "reset", secret).status_code == 404
 
     def test_an_unknown_link_is_refused(self, client, account):
-        assert client.get("/reset/not-a-real-token").status_code == 404
+        assert open_link(client, "reset", "not-a-real-token").status_code == 404
 
     def test_a_reset_token_cannot_be_used_as_an_invite(self, client, db, account):
         """Purpose is checked, so the longer-lived invite flow cannot be reached
         with a short-lived reset token or vice versa."""
         secret = issued_secret(db, account["user"], PURPOSE_RESET)
-        assert client.get(f"/invite/{secret}").status_code == 404
+        assert open_link(client, "invite", secret).status_code == 404
 
     def test_another_tenants_token_is_refused(self, client, db, account):
         elsewhere = make_tenant(db, slug="elsewhere", name="Elsewhere")
         stranger = make_user(db, elsewhere, "x@example.com", ROLE_THERAPIST)
         secret = issued_secret(db, stranger)
         # Requests resolve to "demo"; this token belongs to another tenant.
-        assert client.get(f"/reset/{secret}").status_code == 404
+        assert open_link(client, "reset", secret).status_code == 404
 
 
 class TestSessionsAreRevoked:
@@ -216,7 +221,7 @@ class TestPasswordRules:
     def test_a_rejected_attempt_does_not_burn_the_link(self, client, db, account):
         secret = issued_secret(db, account["user"])
         submit_password(client, "reset", secret, "short")
-        assert client.get(f"/reset/{secret}").status_code == 200
+        assert open_link(client, "reset", secret).status_code == 200
 
     def test_a_rejected_attempt_does_not_change_the_password(self, client, db, account):
         secret = issued_secret(db, account["user"])
@@ -230,7 +235,7 @@ class TestInvitations:
         user = make_user(db, account["tenant"], "new@example.com",
                          ROLE_THERAPIST, password=None)
         secret = issued_secret(db, user, PURPOSE_INVITE)
-        assert client.get(f"/invite/{secret}").status_code == 200
+        assert open_link(client, "invite", secret).status_code == 200
         r = submit_password(client, "invite", secret, NEW_PASSWORD)
         assert r.status_code == 303
 
@@ -279,3 +284,116 @@ class TestSenderConfiguration:
         sender = notifications.for_environment()
         with pytest.raises(notifications.NotificationError):
             sender.send(notifications.Message(to="a@b.c", subject="s", body="b"))
+
+
+class TestCrossPurposeSiblings:
+    """A password change is meant to revoke access. Leaving a live invitation
+    behind after a reset means the account still has a working credential
+    sitting in a mailbox."""
+
+    def test_a_reset_burns_a_live_invite(self, client, db, account):
+        invite = issued_secret(db, account["user"], PURPOSE_INVITE)
+        reset = issued_secret(db, account["user"], PURPOSE_RESET)
+        submit_password(client, "reset", reset, NEW_PASSWORD)
+        client.cookies.clear()
+        assert open_link(client, "invite", invite).status_code == 404
+
+    def test_an_invite_burns_a_live_reset(self, client, db, account):
+        reset = issued_secret(db, account["user"], PURPOSE_RESET)
+        invite = issued_secret(db, account["user"], PURPOSE_INVITE)
+        submit_password(client, "invite", invite, NEW_PASSWORD)
+        client.cookies.clear()
+        assert open_link(client, "reset", reset).status_code == 404
+
+
+class TestLinkOrigin:
+    """Deriving the origin from the request Host header is password reset
+    poisoning: a forged Host makes the victim's emailed link point at the
+    attacker, handing over the token when it is clicked."""
+
+    def test_the_origin_comes_from_configuration(self, monkeypatch, account):
+        monkeypatch.setattr(accounts.config, "TENANT_HOST_SUFFIX", "example.com")
+        link = accounts.link_for(account["tenant"], PURPOSE_RESET, "abc")
+        assert link == "https://demo.example.com/reset/abc"
+
+    def test_a_forged_host_header_cannot_influence_the_link(
+        self, client, db, account, monkeypatch
+    ):
+        monkeypatch.setattr(accounts.config, "TENANT_HOST_SUFFIX", "")
+        monkeypatch.setattr(accounts.config, "DEV_BASE_URL", "http://localhost:8000")
+        page = client.get("/forgot")
+        client.post(
+            "/forgot",
+            data={"email": account["user"].email,
+                  "csrf_token": csrf_token_from(page.text)},
+            headers={"Host": "evil.example.com"},
+        )
+        link = accounts.link_for(account["tenant"], PURPOSE_RESET, "abc")
+        assert "evil.example.com" not in link
+        assert link.startswith("http://localhost:8000/")
+
+    def test_it_refuses_to_guess_outside_dev(self, monkeypatch, account):
+        monkeypatch.setattr(accounts.config, "TENANT_HOST_SUFFIX", "")
+        monkeypatch.setattr(accounts.config, "IS_DEV", False)
+        with pytest.raises(accounts.AccountError):
+            accounts.canonical_base_url(account["tenant"])
+
+
+class TestSecretLeavesTheUrl:
+    """The emailed path lands in browser history, proxy logs, and access logs.
+    It is exchanged once for an HttpOnly cookie so the password POST carries no
+    credential in its URL."""
+
+    def test_the_link_redirects_to_a_secretless_path(self, client, db, account):
+        secret = issued_secret(db, account["user"])
+        r = client.get(f"/reset/{secret}", follow_redirects=False)
+        assert r.status_code == 303
+        assert r.headers["location"] == "/reset"
+        assert secret not in r.headers["location"]
+
+    def test_the_handoff_cookie_is_http_only(self, client, db, account):
+        secret = issued_secret(db, account["user"])
+        r = client.get(f"/reset/{secret}", follow_redirects=False)
+        set_cookie = r.headers["set-cookie"]
+        assert "HttpOnly" in set_cookie
+        assert "care_setpw" in set_cookie
+
+    def test_the_form_posts_to_a_path_without_the_secret(self, client, db, account):
+        secret = issued_secret(db, account["user"])
+        page = open_link(client, "reset", secret)
+        assert 'action="/reset"' in page.text
+        assert secret not in page.text
+
+    def test_the_form_is_unreachable_without_the_cookie(self, client, db, account):
+        issued_secret(db, account["user"])
+        assert client.get("/reset").status_code == 404
+
+    def test_submitting_without_the_cookie_is_refused(self, client, db, account):
+        secret = issued_secret(db, account["user"])
+        page = open_link(client, "reset", secret)
+        token = csrf_token_from(page.text)
+        client.cookies.delete("care_setpw")
+        r = client.post("/reset", data={"password": NEW_PASSWORD,
+                                        "confirmation": NEW_PASSWORD,
+                                        "csrf_token": token})
+        assert r.status_code == 404
+
+    def test_a_reset_cookie_cannot_drive_the_invite_form(self, client, db, account):
+        secret = issued_secret(db, account["user"], PURPOSE_RESET)
+        open_link(client, "reset", secret)
+        assert client.get("/invite").status_code == 404
+
+
+class TestConcurrentUse:
+    def test_consuming_twice_raises_rather_than_setting_two_passwords(
+        self, db, account
+    ):
+        """The lock-and-recheck inside consume(). Without it two concurrent
+        requests carrying the same link could both set a password, with the
+        later commit silently winning."""
+        secret = issued_secret(db, account["user"])
+        token = accounts.lookup(db, account["tenant"], secret, PURPOSE_RESET)
+        accounts.consume(db, token, NEW_PASSWORD)
+        db.commit()
+        with pytest.raises(accounts.AccountError):
+            accounts.consume(db, token, "a-different-passphrase")

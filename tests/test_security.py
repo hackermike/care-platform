@@ -173,10 +173,12 @@ class TestRoutesAreGuarded:
         # reveal nothing about whether an account exists (tests/test_accounts.py).
         ("/forgot", "GET"),
         ("/forgot", "POST"),
-        ("/reset/{secret}", "GET"),
-        ("/reset/{secret}", "POST"),
+        ("/reset/{secret}", "GET"),   # the emailed link; swaps for a cookie
+        ("/reset", "GET"),
+        ("/reset", "POST"),
         ("/invite/{secret}", "GET"),
-        ("/invite/{secret}", "POST"),
+        ("/invite", "GET"),
+        ("/invite", "POST"),
     }
 
     @staticmethod

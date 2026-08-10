@@ -43,6 +43,13 @@ COOKIE_SECURE = not IS_DEV
 TENANT_HOST_SUFFIX = os.getenv("TENANT_HOST_SUFFIX", "")
 DEV_DEFAULT_TENANT_SLUG = os.getenv("DEV_DEFAULT_TENANT_SLUG", "demo")
 
+# The origin used to build emailed links. Never derived from the request Host
+# header: an attacker who sends `Host: evil.example` with a reset request would
+# otherwise have the victim's link point at their server, which is a password
+# reset poisoning attack. In dev there is no wildcard DNS, so a fixed value
+# stands in.
+DEV_BASE_URL = os.getenv("DEV_BASE_URL", "http://localhost:8000")
+
 # Failed-login throttling, per (tenant, email).
 LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_LOCKOUT_MINUTES = int(os.getenv("LOGIN_LOCKOUT_MINUTES", "15"))

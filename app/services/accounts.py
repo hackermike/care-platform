@@ -14,6 +14,7 @@ Two rules shape everything here:
 from dataclasses import dataclass
 from datetime import timedelta
 
+from app import config
 from app.auth.sessions import revoke_all_for_user
 from app.models.account_token import (
     PURPOSE_INVITE,
@@ -147,9 +148,25 @@ def consume(db, token: AccountToken, password: str) -> User:
     compromise, leaving the attacker's session alive would defeat the entire
     exercise — and the user has no way to know it is still there.
 
-    Sibling tokens are consumed too, so a second reset link sitting in the same
-    mailbox cannot be replayed later.
+    Sibling tokens are consumed too, so a second link sitting in the same mailbox
+    cannot be replayed later.
+
+    **The token row is locked and re-checked here.** `lookup()` happens in a
+    separate statement, so without this two concurrent requests carrying the same
+    link could both pass validation and set different passwords, with the later
+    commit silently winning. `with_for_update()` is a no-op on SQLite, which has
+    a single writer anyway; on Postgres it is what makes the check-then-act safe.
     """
+    locked = (
+        db.query(AccountToken)
+        .filter(AccountToken.id == token.id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if locked is None or locked.is_consumed or as_utc(locked.expires_at) <= utcnow():
+        raise AccountError("This link is no longer valid.")
+    token = locked
+
     user = db.get(User, token.user_id)
     if user is None:
         raise AccountError("This account no longer exists.")
@@ -162,17 +179,41 @@ def consume(db, token: AccountToken, password: str) -> User:
     now = utcnow()
     token.consumed_at = now
     db.add(token)
-    for sibling in _live_tokens(db, user.id, token.purpose):
-        sibling.consumed_at = now
-        db.add(sibling)
+    # Burn every outstanding link for the account, not just those of the same
+    # purpose. A password change is meant to revoke access; leaving a live
+    # invitation behind after a reset (or the reverse) means the account still
+    # has a working credential sitting in a mailbox.
+    for purpose in (PURPOSE_INVITE, PURPOSE_RESET):
+        for sibling in _live_tokens(db, user.id, purpose):
+            sibling.consumed_at = now
+            db.add(sibling)
 
     revoke_all_for_user(db, user.id)
     return user
 
 
-def link_for(base_url: str, purpose: str, secret: str) -> str:
+def canonical_base_url(tenant: Tenant) -> str:
+    """The origin for an emailed link.
+
+    Built from configuration and the tenant's slug, **never from the request**.
+    `request.base_url` reflects the Host header, which the caller controls: an
+    attacker requesting a reset for someone else's address with a forged Host
+    would have the victim's emailed link point at their own server, handing over
+    the token when it is clicked. That is password reset poisoning, and deriving
+    the origin from configuration is the fix.
+    """
+    if config.TENANT_HOST_SUFFIX:
+        return f"https://{tenant.slug}.{config.TENANT_HOST_SUFFIX}"
+    if config.IS_DEV:
+        return config.DEV_BASE_URL
+    raise AccountError(
+        "TENANT_HOST_SUFFIX must be set to build account links outside dev."
+    )
+
+
+def link_for(tenant: Tenant, purpose: str, secret: str) -> str:
     path = "/invite" if purpose == PURPOSE_INVITE else "/reset"
-    return f"{base_url.rstrip('/')}{path}/{secret}"
+    return f"{canonical_base_url(tenant).rstrip('/')}{path}/{secret}"
 
 
 def message_for(purpose: str, tenant: Tenant, link: str):
@@ -214,6 +255,7 @@ __all__ = [
     "RESET_TTL_HOURS",
     "consume",
     "issue",
+    "canonical_base_url",
     "link_for",
     "lookup",
     "message_for",
