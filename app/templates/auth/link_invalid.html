@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Link no longer valid — {{ tenant.display_name }}{% endblock %}
+{% block content %}
+<main class="max-w-sm mx-auto p-10">
+  <h1 class="text-xl font-semibold">This link is no longer valid</h1>
+  <p class="mt-3 text-sm text-gray-600">
+    Links can only be used once, and they expire. If you still need to get in,
+    request a new one.
+  </p>
+  <p class="mt-4 text-sm">
+    <a class="underline" href="/forgot">Request a new link</a> ·
+    <a class="underline" href="/login">Back to sign in</a>
+  </p>
+  {% if tenant.support_email %}
+  <p class="mt-6 text-xs text-gray-500">
+    Still stuck? <a class="underline" href="mailto:{{ tenant.support_email }}">{{ tenant.support_email }}</a>
+  </p>
+  {% endif %}
+</main>
+{% endblock %}

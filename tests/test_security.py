@@ -151,6 +151,14 @@ class TestRoutesAreGuarded:
 
     This is the control that outlives any individual reviewer — adding an
     unguarded route fails here rather than waiting to be noticed.
+
+    **Enumerating the routes is the hard part.** FastAPI keeps each
+    `include_router()` call as an `_IncludedRouter` wrapper inside `app.routes`
+    rather than flattening its routes in. An earlier version of this test walked
+    `app.routes` and skipped anything without a `.path`, which silently skipped
+    every routed endpoint in the application and checked only `/healthz`. It
+    passed for a week while asserting nothing. `_walk` exists so that cannot
+    recur, and `test_the_walk_reaches_routed_endpoints` guards the guard.
     """
 
     # Routes that are public by design, and why.
@@ -160,33 +168,66 @@ class TestRoutesAreGuarded:
         ("/logout", "POST"),    # ending a session needs no role
         ("/", "GET"),           # redirects to login or the user's surface
         ("/healthz", "GET"),    # liveness probe; no tenant, no data
+        # Account recovery: a locked-out user cannot authenticate to ask for
+        # help, so these must be reachable without a session. Each is written to
+        # reveal nothing about whether an account exists (tests/test_accounts.py).
+        ("/forgot", "GET"),
+        ("/forgot", "POST"),
+        ("/reset/{secret}", "GET"),
+        ("/reset/{secret}", "POST"),
+        ("/invite/{secret}", "GET"),
+        ("/invite/{secret}", "POST"),
     }
 
-    def test_every_route_requires_a_role_or_is_listed_public(self):
+    @staticmethod
+    def _walk(routes):
+        """Yield every real endpoint, descending into included routers."""
+        for route in routes:
+            nested = getattr(route, "original_router", None)
+            if nested is not None:
+                yield from TestRoutesAreGuarded._walk(nested.routes)
+                continue
+            if hasattr(route, "routes"):  # sub-application or mount
+                yield from TestRoutesAreGuarded._walk(route.routes)
+                continue
+            if getattr(route, "path", None) and hasattr(route, "methods"):
+                yield route
+
+    @classmethod
+    def _endpoints(cls):
         from app.main import app
 
-        unguarded = []
-        for route in app.routes:
-            path = getattr(route, "path", None)
-            if path is None or not hasattr(route, "methods"):
-                continue
-            if path.startswith(("/openapi", "/docs", "/redoc")):
+        found = []
+        for route in cls._walk(app.routes):
+            if route.path.startswith(("/openapi", "/docs", "/redoc")):
                 continue
             for method in route.methods - {"HEAD", "OPTIONS"}:
-                if (path, method) in self.PUBLIC:
-                    continue
-                dependencies = str(getattr(route, "dependant", ""))
-                source = ""
-                endpoint = getattr(route, "endpoint", None)
-                if endpoint is not None:
-                    import inspect
+                found.append((route.path, method, route.endpoint))
+        return found
 
-                    try:
-                        source = inspect.getsource(endpoint)
-                    except OSError:
-                        source = ""
-                if "require_" not in source and "require_" not in dependencies:
-                    unguarded.append(f"{method} {path}")
+    def test_the_walk_reaches_routed_endpoints(self):
+        """Guards the guard: if enumeration silently misses routers again, the
+        check below becomes vacuous rather than failing."""
+        paths = {path for path, _, _ in self._endpoints()}
+        # A sample from each router, so a regression in any of them shows up.
+        for expected in ("/login", "/app/clients", "/portal", "/admin/therapists",
+                         "/forgot", "/healthz"):
+            assert expected in paths, f"route enumeration missed {expected}"
+        assert len(paths) > 20, f"only found {len(paths)} routes; enumeration is broken"
+
+    def test_every_route_requires_a_role_or_is_listed_public(self):
+        import inspect
+
+        unguarded = []
+        for path, method, endpoint in self._endpoints():
+            if (path, method) in self.PUBLIC:
+                continue
+            try:
+                source = inspect.getsource(endpoint)
+            except (OSError, TypeError):
+                source = ""
+            if "require_" not in source:
+                unguarded.append(f"{method} {path}")
 
         assert not unguarded, (
             "these routes have no role dependency and are not declared public: "

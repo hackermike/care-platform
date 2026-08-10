@@ -1,4 +1,5 @@
 """Importing this package registers every model on the shared Base."""
+from app.models.account_token import AccountToken  # noqa: F401
 from app.models.appointment import Appointment  # noqa: F401
 from app.models.audit import AuditLog  # noqa: F401
 from app.models.client import Client  # noqa: F401

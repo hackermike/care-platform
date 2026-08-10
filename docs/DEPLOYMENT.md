@@ -25,7 +25,7 @@ columns are no longer unverified on the production database.
 
 | Gap | Consequence today |
 |---|---|
-| **Account invitation + password reset** | Accounts exist only via `dev-scripts/manage.py`, and a user who forgets their password cannot recover it. Needs a BAA-covered email provider (Postmark, SES) — note that even an invitation email is arguably PHI-adjacent, since it reveals a treatment relationship. |
+| **A BAA-covered email provider** | The invitation and password-reset flows are built (`app/services/accounts.py`), but nothing can send the mail: outside `APP_ENV=dev` the sender raises rather than silently dropping a reset link. Wire up Postmark/SES **under a BAA** — even an invitation email is PHI-adjacent, since it reveals that a named person has a relationship with a named practice. |
 | **Per-user timezone** | Session times are stored UTC and entered as naive local, so a therapist booking 15:00 gets 15:00 UTC. Correct storage, wrong experience. |
 | **Local frontend assets** | `base.html` loads Tailwind *and* HTMX from CDNs, and the `htmx:configRequest` handler is inline. All three are third-party or inline execution on a page rendering PHI, and the CSP names those hosts and allows `'unsafe-inline'` to permit them. Unlocking `TARGET_CSP` in `app/security/headers.py` needs **all three**: precompile Tailwind, serve HTMX from the same origin, and move the inline handler to a file. Run `CSP_REPORT_ONLY=1` first to see what still violates. |
 | **Rate limiting** | Only login is throttled, per (tenant, email). Nothing limits request volume generally. |
