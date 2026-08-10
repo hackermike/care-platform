@@ -319,8 +319,26 @@ class TestLinkOrigin:
     def test_a_forged_host_header_cannot_influence_the_link(
         self, client, db, account, monkeypatch
     ):
+        """Observes the message the forged request actually produced.
+
+        An earlier version of this test called `link_for` again afterwards and
+        inspected *that*, so it would have passed even if the route built the
+        emailed link from `request.base_url` — the exact regression it exists to
+        catch. TestClient runs background tasks before returning, so a recording
+        sender sees the real body.
+        """
+        from app import notifications
+
+        sent = []
+
+        class Recorder:
+            def send(self, message):
+                sent.append(message)
+
         monkeypatch.setattr(accounts.config, "TENANT_HOST_SUFFIX", "")
         monkeypatch.setattr(accounts.config, "DEV_BASE_URL", "http://localhost:8000")
+        monkeypatch.setattr(notifications, "for_environment", lambda: Recorder())
+
         page = client.get("/forgot")
         client.post(
             "/forgot",
@@ -328,9 +346,55 @@ class TestLinkOrigin:
                   "csrf_token": csrf_token_from(page.text)},
             headers={"Host": "evil.example.com"},
         )
-        link = accounts.link_for(account["tenant"], PURPOSE_RESET, "abc")
-        assert "evil.example.com" not in link
-        assert link.startswith("http://localhost:8000/")
+
+        assert sent, "no reset email was produced"
+        body = sent[0].body
+        assert "evil.example.com" not in body
+        assert "http://localhost:8000/reset/" in body
+
+    def test_the_recorded_link_uses_the_configured_suffix(
+        self, client, db, account, monkeypatch
+    ):
+        from app import config as app_config
+        from app import notifications
+
+        sent = []
+
+        class Recorder:
+            def send(self, message):
+                sent.append(message)
+
+        # Both the tenancy layer and the link builder read this.
+        monkeypatch.setattr(app_config, "TENANT_HOST_SUFFIX", "example.com")
+        monkeypatch.setattr(accounts.config, "TENANT_HOST_SUFFIX", "example.com")
+        monkeypatch.setattr(notifications, "for_environment", lambda: Recorder())
+
+        headers = {"Host": "demo.example.com"}
+        page = client.get("/forgot", headers=headers)
+        client.post(
+            "/forgot",
+            data={"email": account["user"].email,
+                  "csrf_token": csrf_token_from(page.text)},
+            headers=headers,
+        )
+        assert sent, "no reset email was produced"
+        assert "https://demo.example.com/reset/" in sent[0].body
+
+    def test_an_unknown_subdomain_does_not_resolve_a_tenant(
+        self, client, db, account, monkeypatch
+    ):
+        """Defence in depth: with a suffix configured, a Host naming a tenant
+        that does not exist fails resolution before any link is built.
+
+        A host *outside* the suffix still falls back to DEV_DEFAULT_TENANT_SLUG
+        while APP_ENV is dev — that fallback is dev-only and `resolve_tenant`
+        fails closed without it.
+        """
+        from app import config as app_config
+
+        monkeypatch.setattr(app_config, "TENANT_HOST_SUFFIX", "example.com")
+        r = client.get("/forgot", headers={"Host": "evil.example.com"})
+        assert r.status_code == 404
 
     def test_it_refuses_to_guess_outside_dev(self, monkeypatch, account):
         monkeypatch.setattr(accounts.config, "TENANT_HOST_SUFFIX", "")

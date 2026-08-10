@@ -161,6 +161,11 @@ def consume(db, token: AccountToken, password: str) -> User:
         db.query(AccountToken)
         .filter(AccountToken.id == token.id)
         .with_for_update()
+        # populate_existing() is what makes the recheck mean anything: the
+        # instance is already in the session from lookup(), and SQLAlchemy
+        # returns identity-mapped objects without refreshing their attributes.
+        # Without it the lock would be taken and then stale values inspected.
+        .populate_existing()
         .one_or_none()
     )
     if locked is None or locked.is_consumed or as_utc(locked.expires_at) <= utcnow():
@@ -206,6 +211,12 @@ def canonical_base_url(tenant: Tenant) -> str:
         return f"https://{tenant.slug}.{config.TENANT_HOST_SUFFIX}"
     if config.IS_DEV:
         return config.DEV_BASE_URL
+    # Unreachable in a correctly configured deployment: config.py refuses to
+    # start without TENANT_HOST_SUFFIX outside dev. Raising here rather than
+    # per request matters because this is only called for an address that *has*
+    # an account — a 500 for those and a 200 for everyone else would turn a
+    # misconfiguration into the account-existence oracle this module exists to
+    # avoid.
     raise AccountError(
         "TENANT_HOST_SUFFIX must be set to build account links outside dev."
     )

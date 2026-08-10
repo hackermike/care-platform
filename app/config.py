@@ -40,7 +40,24 @@ COOKIE_SECURE = not IS_DEV
 # Tenant resolution. Requests are mapped to a tenant by host subdomain
 # (acme.example.com -> "acme"). Local dev has no subdomains, so a default slug
 # stands in. See app/tenancy.py.
-TENANT_HOST_SUFFIX = os.getenv("TENANT_HOST_SUFFIX", "")
+def _tenant_host_suffix() -> str:
+    """The DNS suffix tenants live under.
+
+    Required outside dev. Checking it at import means a misconfigured deployment
+    fails loudly on startup; deferring it to the first emailed link would fail
+    only for addresses that have an account, which is an account-existence
+    oracle wearing a 500.
+    """
+    suffix = os.getenv("TENANT_HOST_SUFFIX", "").strip()
+    if suffix or IS_DEV:
+        return suffix
+    raise RuntimeError(
+        "TENANT_HOST_SUFFIX must be set when APP_ENV is not 'dev'. Tenants "
+        "resolve by host subdomain, and emailed links are built from it."
+    )
+
+
+TENANT_HOST_SUFFIX = _tenant_host_suffix()
 DEV_DEFAULT_TENANT_SLUG = os.getenv("DEV_DEFAULT_TENANT_SLUG", "demo")
 
 # The origin used to build emailed links. Never derived from the request Host
